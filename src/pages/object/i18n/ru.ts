@@ -1,0 +1,28 @@
+/** Texts of the object page. Namespace: `object`. */
+export const objectRu = {
+  edit: 'Редактировать',
+  delete: 'Удалить',
+  actions: 'Действия с объектом',
+  crumbs: { objects: 'Объекты', object: 'Объект' },
+  tasks: 'Задачи',
+  loadError: 'Не удалось загрузить объект',
+  retry: 'Повторить',
+  notFoundCode: '404',
+  notFoundTitle: 'Объект не найден или недоступен',
+  notFoundDescription: 'Возможно, объект удалён или у вас нет к нему доступа.',
+  home: 'На главную',
+  table: 'Задачи объекта',
+  search: 'Поиск по названию и исполнителю',
+  columns: {
+    title: 'Название',
+    assignee: 'Исполнитель',
+    status: 'Статус',
+    createdAt: 'Создана',
+  },
+  filters: { status: 'Статус' },
+  empty: 'В объекте пока нет задач',
+  emptyHintManager: 'Добавьте первую задачу и назначьте исполнителя.',
+  noResults: 'Ничего не найдено',
+  noResultsHint: 'Измените запрос или сбросьте фильтры.',
+  tasksLoadError: 'Не удалось загрузить задачи',
+} as const

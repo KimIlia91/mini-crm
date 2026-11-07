@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Mini-CRM</title>
+    <script>
+      // Applies the stored theme before the first paint (no flash). Keep the key in sync with
+      // THEME_STORAGE_KEY in src/shared/theme.
+      ;(function () {
+        var theme = 'system'
+        try {
+          var stored = window.localStorage.getItem('mini-crm-theme')
+          if (stored === 'light' || stored === 'dark') theme = stored
+        } catch (error) {
+          // Blocked storage: fall back to the system theme.
+        }
+        var dark =
+          theme === 'dark' ||
+          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        var root = document.documentElement
+        root.classList.toggle('dark', dark)
+        root.style.colorScheme = dark ? 'dark' : 'light'
+        var meta = document.querySelector('meta[name="theme-color"]')
+        if (meta) meta.setAttribute('content', dark ? '#0b1120' : '#ffffff')
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/app/entrypoint/main.tsx"></script>
+  </body>
+</html>

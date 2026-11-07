@@ -1,0 +1,40 @@
+/** Texts of the task page. Namespace: `task`. */
+export const taskRu = {
+  loadError: 'Не удалось загрузить задачу',
+  crumbs: { objects: 'Объекты', task: 'Задача' },
+  actions: 'Действия с задачей',
+  edit: 'Редактировать',
+  delete: 'Удалить',
+  retry: 'Повторить',
+  notFoundCode: '404',
+  notFoundTitle: 'Задача не найдена или недоступна',
+  notFoundDescription: 'Возможно, задача удалена или у вас нет к ней доступа.',
+  home: 'На главную',
+  description: { title: 'Описание', empty: 'Описание не указано' },
+  details: {
+    title: 'Детали',
+    object: 'Объект',
+    assignee: 'Исполнитель',
+    author: 'Автор',
+    createdAt: 'Создана',
+  },
+  reworkNotice: { title: 'Замечание постановщика', meta: '{{name}}, {{date}}' },
+  actionsLoadError: 'Не удалось загрузить доступные действия',
+  comment: {
+    description: 'Комментарий обязателен: исполнитель увидит его в истории.',
+    label: 'Комментарий',
+  },
+  validation: {
+    commentRequired: 'Укажите комментарий',
+    commentTooLong: 'Не более 1000 символов',
+  },
+  history: {
+    title: 'История',
+    empty: 'История пуста',
+    loadError: 'Не удалось загрузить историю',
+    retry: 'Повторить',
+    created: 'Задача создана',
+    changedTo: 'изменён на',
+    author: 'Автор изменения: {{name}}',
+  },
+} as const

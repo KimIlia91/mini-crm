@@ -1,0 +1,21 @@
+/** Texts of the objects list. Namespace: `objects`. */
+export const objectsRu = {
+  title: 'Объекты',
+  descriptionManager: 'Все объекты. Откройте объект, чтобы увидеть его задачи.',
+  descriptionExecutor: 'Объекты, в которых у вас есть задачи.',
+  add: 'Добавить объект',
+  table: 'Список объектов',
+  search: 'Поиск по названию и адресу',
+  columns: { name: 'Название', address: 'Адрес', actions: 'Действия' },
+  rowActions: 'Действия с объектом «{{name}}»',
+  edit: 'Редактировать',
+  delete: 'Удалить',
+  emptyManager: 'Объектов пока нет',
+  emptyManagerHint: 'Добавьте первый объект, чтобы создавать в нём задачи.',
+  emptyExecutor: 'У вас пока нет объектов с задачами',
+  emptyExecutorHint: 'Объекты появятся, когда вам назначат задачу.',
+  noResults: 'Ничего не найдено',
+  noResultsHint: 'Измените запрос или сбросьте фильтры.',
+  loadError: 'Не удалось загрузить объекты.',
+  retry: 'Повторить',
+} as const

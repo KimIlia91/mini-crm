@@ -1,0 +1,53 @@
+/** Texts used by shared/ui and shared/auth, identical on every screen. Namespace: `common`. */
+export const commonRu = {
+  appName: 'Mini-CRM',
+  loading: 'Загрузка',
+  skipToMain: 'К содержимому',
+  actions: {
+    cancel: 'Отмена',
+    close: 'Закрыть',
+  },
+  table: {
+    sortBy: 'Сортировка: {{title}}',
+    sortAsc: 'По возрастанию',
+    sortDesc: 'По убыванию',
+    hideColumn: 'Скрыть столбец',
+    columns: 'Столбцы',
+    showColumns: 'Показывать столбцы',
+    filterSelected: '{{title}}: выбрано {{selected}}',
+    resetFilter: 'Сбросить фильтр',
+    reset: 'Сбросить',
+    rowsPerPage: 'Строк на странице',
+    pageOf: 'Страница {{current}} из {{total}}',
+    pageShort: '{{current}} из {{total}}',
+    pagination: 'Пагинация',
+    firstPage: 'Первая страница',
+    previousPage: 'Предыдущая страница',
+    nextPage: 'Следующая страница',
+    lastPage: 'Последняя страница',
+    pageNumber: 'Страница {{page}}',
+    scrollArea: 'Прокручиваемая область таблицы «{{label}}»',
+  },
+  theme: {
+    toggle: 'Сменить тему',
+    light: 'Светлая',
+    dark: 'Тёмная',
+    system: 'Системная',
+  },
+  sidebar: {
+    toggle: 'Переключить боковую панель',
+    title: 'Меню',
+    description: 'Основная навигация',
+  },
+  breadcrumb: {
+    label: 'Навигация по страницам',
+    more: 'Ещё',
+    showPath: '{{label}}: показать путь',
+  },
+  signOut: {
+    title: 'Выйти из аккаунта?',
+    description: 'Чтобы продолжить работу, потребуется войти снова.',
+    confirm: 'Выйти',
+    error: 'Не удалось выйти. Повторите попытку',
+  },
+} as const

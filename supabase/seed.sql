@@ -1,0 +1,1 @@
+-- Intentionally empty: no seed data; tests create the data they need.
