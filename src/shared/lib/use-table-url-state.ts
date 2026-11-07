@@ -33,7 +33,6 @@ export interface TableUrlState {
   sorting: SortingState
   onSortingChange: OnChangeFn<SortingState>
   onGlobalFilterChange: OnChangeFn<string>
-  resetPage: () => void
   onColumnFiltersChange: OnChangeFn<ColumnFiltersState>
   onPaginationChange: OnChangeFn<PaginationState>
 }
@@ -111,6 +110,7 @@ export function useTableUrlState({
       setSearchParams(
         (previous) => {
           const params = new URLSearchParams(previous)
+          if (next !== (params.get(SEARCH_PARAM) ?? '')) params.delete(PAGE_PARAM)
           if (next === '') params.delete(SEARCH_PARAM)
           else params.set(SEARCH_PARAM, next)
           return params
@@ -120,17 +120,6 @@ export function useTableUrlState({
     },
     [globalFilter, setSearchParams],
   )
-
-  const resetPage = useCallback(() => {
-    setSearchParams(
-      (previous) => {
-        const params = new URLSearchParams(previous)
-        params.delete(PAGE_PARAM)
-        return params
-      },
-      { replace: true },
-    )
-  }, [setSearchParams])
 
   const onSortingChange = useCallback<OnChangeFn<SortingState>>(
     (updater) => {
@@ -191,7 +180,6 @@ export function useTableUrlState({
     sorting,
     onSortingChange,
     onGlobalFilterChange,
-    resetPage,
     onColumnFiltersChange,
     onPaginationChange,
   }

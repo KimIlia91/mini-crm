@@ -71,17 +71,13 @@ describe('useTableUrlState', () => {
     expect(result.current.state.columnFilters).toEqual([])
   })
 
-  it('writes the search with replace, keeps the page until resetPage and omits an empty value', () => {
+  it('writes the search with replace, resets the page and omits an empty value', () => {
     const { result } = setup('/x?page=3')
     act(() => {
       result.current.state.onGlobalFilterChange('abc')
     })
-    expect(result.current.location.search).toBe('?page=3&q=abc')
-    expect(result.current.navigationType).toBe('REPLACE')
-    act(() => {
-      result.current.state.resetPage()
-    })
     expect(result.current.location.search).toBe('?q=abc')
+    expect(result.current.navigationType).toBe('REPLACE')
     act(() => {
       result.current.state.onGlobalFilterChange('')
     })
