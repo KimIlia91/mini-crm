@@ -3,7 +3,8 @@
  * Copyright (c) 2024 Sat Naing, MIT License. See THIRD_PARTY_NOTICES.md.
  */
 import { useTranslation } from 'react-i18next'
-import { LogOutIcon } from 'lucide-react'
+import { Link } from 'react-router'
+import { InfoIcon, LogOutIcon } from 'lucide-react'
 
 import type { Viewer } from '@/entities/profile'
 import { useTheme } from '@/shared/theme'
@@ -78,6 +79,12 @@ export function UserMenuContent({ viewer, side = 'bottom', onSignOut }: UserMenu
         <DropdownMenuRadioItem value="system">{tc('theme.system')}</DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
+        <Link to="/about">
+          <InfoIcon />
+          {t('profile.about')}
+        </Link>
+      </DropdownMenuItem>
       <DropdownMenuItem variant="destructive" onSelect={onSignOut}>
         <LogOutIcon />
         {t('profile.signOut')}

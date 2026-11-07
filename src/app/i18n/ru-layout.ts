@@ -17,6 +17,7 @@ export const layoutRu = {
   profile: {
     menu: 'Меню пользователя: {{name}}',
     theme: 'Тема',
+    about: 'О проекте',
     signOut: 'Выйти',
   },
   noAccess: {

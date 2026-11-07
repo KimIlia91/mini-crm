@@ -168,6 +168,8 @@ test.describe('document structure', () => {
     await expectTitle(page, 'Вход в Mini-CRM — Mini-CRM')
     await page.goto(`/nothing-${uid()}`)
     await expectTitle(page, 'Страница не найдена — Mini-CRM')
+    await page.goto('/about')
+    await expectTitle(page, 'О проекте — Mini-CRM')
 
     await login(page, m)
     await expectTitle(page, 'Объекты — Mini-CRM')

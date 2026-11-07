@@ -5,6 +5,7 @@ export const loginRu = {
   email: 'Email',
   password: 'Пароль',
   submit: 'Войти',
+  about: 'О проекте',
   validation: {
     emailInvalid: 'Введите корректный email',
     passwordRequired: 'Введите пароль',

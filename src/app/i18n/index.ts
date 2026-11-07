@@ -1,6 +1,7 @@
 import { entityTaskRu } from '@/entities/task'
 import { manageObjectRu } from '@/features/manage-object'
 import { manageTaskRu } from '@/features/manage-task'
+import { aboutRu } from '@/pages/about'
 import { changePasswordRu } from '@/pages/change-password'
 import { loginRu } from '@/pages/login'
 import { myTasksRu } from '@/pages/my-tasks'
@@ -26,6 +27,7 @@ export const resources = {
   object: objectRu,
   task: taskRu,
   'my-tasks': myTasksRu,
+  about: aboutRu,
 } as const
 
 for (const [namespace, bundle] of Object.entries(resources)) {

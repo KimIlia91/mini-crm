@@ -196,6 +196,46 @@ describe('app routes', () => {
     })
   })
 
+  describe('about page', () => {
+    it('is public: a signed-out user stays on /about', async () => {
+      const { router } = renderApp('/about', SIGNED_OUT)
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'О проекте' }),
+      ).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/about')
+    })
+
+    it('stays visible when the profile fails to load', async () => {
+      fake.profile = { data: null, error: { message: 'network' } }
+      const { router } = renderApp('/about', SIGNED_IN)
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'О проекте' }),
+      ).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/about')
+    })
+
+    it('is not redirected while a password change is required', async () => {
+      fake.profile = profile('executor', true)
+      const { router } = renderApp('/about', SIGNED_IN)
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'О проекте' }),
+      ).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/about')
+      expect(screen.getByRole('link', { name: 'К приложению' })).toHaveAttribute('href', '/')
+    })
+
+    it('opens from the user menu', async () => {
+      const { router } = renderApp('/objects', SIGNED_IN)
+      expect(await screen.findByRole('heading', { name: 'Объекты' })).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: /Меню пользователя/ }))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'О проекте' }))
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'О проекте' }),
+      ).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/about')
+    })
+  })
+
   it('renders the not-found page for unknown paths when signed out', async () => {
     renderApp('/definitely-missing', SIGNED_OUT)
     expect(await screen.findByRole('heading', { name: 'Страница не найдена' })).toBeInTheDocument()

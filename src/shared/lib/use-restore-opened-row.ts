@@ -48,7 +48,7 @@ export function useRestoreOpenedRow(listKey: string, ready: boolean): void {
       clearTimeout(timer)
     }
     function tryFocus() {
-      const link = findRowLink(rowId) 
+      const link = findRowLink(rowId)
       if (!link) return
       link.focus({ preventScroll: true })
       if (document.activeElement !== link) return

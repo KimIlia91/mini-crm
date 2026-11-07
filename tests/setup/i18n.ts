@@ -3,6 +3,7 @@ import { layoutRu } from '../../src/app/i18n/ru-layout'
 import { entityTaskRu } from '../../src/entities/task/i18n/ru'
 import { manageObjectRu } from '../../src/features/manage-object/i18n/ru'
 import { manageTaskRu } from '../../src/features/manage-task/i18n/ru'
+import { aboutRu } from '../../src/pages/about/i18n/ru'
 import { changePasswordRu } from '../../src/pages/change-password/i18n/ru'
 import { loginRu } from '../../src/pages/login/i18n/ru'
 import { myTasksRu } from '../../src/pages/my-tasks/i18n/ru'
@@ -27,6 +28,7 @@ const bundles = {
   object: objectRu,
   task: taskRu,
   'my-tasks': myTasksRu,
+  about: aboutRu,
 }
 
 for (const [namespace, bundle] of Object.entries(bundles)) {

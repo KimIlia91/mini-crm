@@ -52,7 +52,11 @@ describe('AppLayout page transition', () => {
 
     expect(scrollTo).not.toHaveBeenCalled()
     expect(await screen.findByText('B: /b?y=2')).toBeInTheDocument()
-    expect(scrollTo).toHaveBeenCalledWith(0, 0)
+    // The reset runs from the exit-complete callback; its order relative to the entering page's
+    // first commit is not guaranteed (the entering page is still transparent at that moment).
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith(0, 0)
+    })
     await waitFor(() => {
       expect(screen.queryByText(/^A:/)).not.toBeInTheDocument()
     })

@@ -34,10 +34,12 @@ describe('LoginPage', () => {
     api.signInWithPassword.mockReset()
   })
 
-  it('has no sign-up link and no accessibility violations', async () => {
+  it('links only to the about page (no sign-up) and has no accessibility violations', async () => {
     const { container } = renderLogin()
     expect(screen.getByRole('heading', { level: 1, name: 'Вход в Mini-CRM' })).toBeInTheDocument()
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    const links = screen.getAllByRole('link')
+    expect(links).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'О проекте' })).toHaveAttribute('href', '/about')
     await expectNoAxeViolations(container)
   })
 

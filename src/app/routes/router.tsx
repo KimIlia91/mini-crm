@@ -1,5 +1,6 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
 
+import { AboutPage } from '@/pages/about'
 import { ChangePasswordPage } from '@/pages/change-password'
 import { LoginPage } from '@/pages/login'
 import { MyTasksPage } from '@/pages/my-tasks'
@@ -25,6 +26,7 @@ const myTasksHandle: RouteHandle = { crumbs: [{ id: 'my-tasks', labelKey: 'crumb
  */
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
+  { path: '/about', element: <AboutPage /> },
   {
     element: <RequireAuth />,
     children: [

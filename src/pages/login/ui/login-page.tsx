@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { Navigate, useLocation } from 'react-router'
+import { Link, Navigate, useLocation } from 'react-router'
 
 import { getAuthErrorCode, signInWithPassword } from '@/shared/api'
 import { useSession } from '@/shared/auth'
@@ -26,6 +26,7 @@ import {
   FieldLabel,
   Input,
   Spinner,
+  textLinkClass,
 } from '@/shared/ui'
 
 import { LOGIN_FORM_ERROR_KEYS, loginSchema, type LoginValues } from '../model/login-schema'
@@ -115,6 +116,11 @@ export function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      <p className="text-center text-sm">
+        <Link to="/about" className={textLinkClass}>
+          {t('about')}
+        </Link>
+      </p>
     </AuthLayout>
   )
 }
