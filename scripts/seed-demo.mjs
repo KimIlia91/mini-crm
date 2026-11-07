@@ -158,6 +158,41 @@ async function assertNoDemoUsers(admin) {
   }
 }
 
+// `--recreate`: removes only the demo accounts, and only while they own no objects or tasks
+// (e.g. accounts left without profiles by an earlier run). Real data is never deleted here.
+async function removeDemoUsers(admin) {
+  const wanted = new Set(Object.values(USERS).map((u) => u.email))
+  const found = []
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) fail('Не удалось получить список пользователей', error)
+    found.push(...data.users.filter((u) => wanted.has(u.email ?? '')))
+    if (data.users.length < 200) break
+  }
+  if (found.length === 0) return
+  const ids = found.map((u) => u.id)
+  const [tasks, objects] = await Promise.all([
+    admin
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .or(`author_id.in.(${ids.join(',')}),assignee_id.in.(${ids.join(',')})`),
+    admin.from('objects').select('id', { count: 'exact', head: true }),
+  ])
+  if (tasks.error) fail('Не удалось проверить задачи демо-пользователей', tasks.error)
+  if (objects.error) fail('Не удалось проверить объекты', objects.error)
+  if ((tasks.count ?? 0) > 0 || (objects.count ?? 0) > 0) {
+    console.error(
+      'Ошибка: у демо-пользователей уже есть данные (объекты/задачи) — --recreate их не удаляет.',
+    )
+    process.exit(1)
+  }
+  for (const user of found) {
+    const { error } = await admin.auth.admin.deleteUser(user.id)
+    if (error) fail(`Не удалось удалить ${user.email ?? user.id}`, error)
+  }
+  console.log(`Удалены прежние демо-пользователи без данных: ${String(found.length)}`)
+}
+
 async function createUser(admin, user, password) {
   const { data, error } = await admin.auth.admin.createUser({
     email: user.email,
@@ -215,6 +250,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
+  if (process.argv.includes('--recreate')) await removeDemoUsers(admin)
   await assertNoDemoUsers(admin)
 
   const manager = await createUserWithChangedPassword(admin, env, USERS.manager, passwords.demo)
