@@ -59,6 +59,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: static
+    env:
+      RUN_E2E: ${{ github.ref == 'refs/heads/prod' || github.base_ref == 'prod' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -76,12 +78,16 @@ jobs:
         run: npm run test:db
       - name: Integration tests (real Supabase)
         run: npm run test:integration
+      # Browser tests are slow (~15 min): they run for the prod branch (push and PRs into it)
+      # and on manual runs, not on every push to main.
       - name: Install Playwright Chromium
+        if: env.RUN_E2E == 'true'
         run: npx playwright install --with-deps chromium
       - name: E2E + accessibility
+        if: env.RUN_E2E == 'true'
         run: npm run test:e2e
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
+        if: failure() && env.RUN_E2E == 'true'
         with:
           name: playwright-report
           path: playwright-report/
