@@ -3,6 +3,7 @@
  * Copyright (c) 2024 Sat Naing, MIT License. See THIRD_PARTY_NOTICES.md.
  */
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   NavigationType,
   UNSAFE_LocationContext as LocationContext,
@@ -17,11 +18,14 @@ import {
   SidebarInset,
   SidebarProvider,
   SkipToMain,
+  Toaster,
   TooltipProvider,
 } from '@/shared/ui'
 
 import { AppHeader } from '../layout/app-header'
 import { AppSidebar } from '../layout/app-sidebar'
+import { useNotificationToasts } from '../realtime/notification-toasts'
+import { useRealtimeSync } from '../realtime/use-realtime-sync'
 
 /** The sidebar keeps its state in this cookie (written by SidebarProvider). */
 function readSidebarOpen(): boolean {
@@ -30,7 +34,9 @@ function readSidebarOpen(): boolean {
 
 /** Inset shell for signed-in screens; `main` is the skip-link target. */
 export function AppLayout() {
+  const { t } = useTranslation('layout')
   const viewer = useViewer()
+  useRealtimeSync(viewer, useNotificationToasts(viewer.id))
   const location = useLocation()
   const navigationType = useNavigationType()
   const outlet = useOutlet()
@@ -68,6 +74,10 @@ export function AppLayout() {
           </main>
         </SidebarInset>
       </SidebarProvider>
+      <Toaster
+        containerAriaLabel={t('notifications.region')}
+        toastOptions={{ closeButtonAriaLabel: t('notifications.toastClose') }}
+      />
     </TooltipProvider>
   )
 }

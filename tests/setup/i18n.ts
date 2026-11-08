@@ -1,5 +1,6 @@
 import { DEFAULT_LANGUAGE, i18n } from '../../src/shared/i18n'
 import { layoutRu } from '../../src/app/i18n/ru-layout'
+import { entityNotificationRu } from '../../src/entities/notification/i18n/ru'
 import { entityTaskRu } from '../../src/entities/task/i18n/ru'
 import { manageObjectRu } from '../../src/features/manage-object/i18n/ru'
 import { manageTaskRu } from '../../src/features/manage-task/i18n/ru'
@@ -18,6 +19,7 @@ import { taskRu } from '../../src/pages/task/i18n/ru'
  */
 const bundles = {
   layout: layoutRu,
+  'entity-notification': entityNotificationRu,
   'entity-task': entityTaskRu,
   'manage-object': manageObjectRu,
   'manage-task': manageTaskRu,

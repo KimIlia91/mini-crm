@@ -118,6 +118,15 @@ export {
   SelectTrigger,
   SelectValue,
 } from './select'
+export {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from './popover'
 export { Separator } from './separator'
 export {
   Sheet,
@@ -148,6 +157,7 @@ export {
   SidebarTrigger,
   useSidebar,
 } from './sidebar'
+export { Toaster, toast } from './sonner'
 export { SkipToMain } from './skip-to-main'
 export { Spinner } from './spinner'
 export {

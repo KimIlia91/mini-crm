@@ -13,6 +13,7 @@ import { AppLayout } from './app-layout'
 import { HomeRedirect } from './home-redirect'
 import { CHANGE_PASSWORD_PATH, RequireAuth } from './require-auth'
 import { RequireRole } from './require-role'
+import { RouteError } from './route-error'
 import type { RouteHandle } from './route-handle'
 
 const objectsHandle: RouteHandle = { crumbs: [{ id: 'objects', labelKey: 'crumbs.objects' }] }
@@ -25,28 +26,40 @@ const myTasksHandle: RouteHandle = { crumbs: [{ id: 'my-tasks', labelKey: 'crumb
  * registered by `app/i18n` through the same public APIs, so a lazy chunk would not be split anyway.
  */
 export const routes: RouteObject[] = [
-  { path: '/login', element: <LoginPage /> },
-  { path: '/about', element: <AboutPage /> },
   {
-    element: <RequireAuth />,
+    errorElement: <RouteError />,
     children: [
-      { path: CHANGE_PASSWORD_PATH, element: <ChangePasswordPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/about', element: <AboutPage /> },
       {
-        element: <AppLayout />,
+        element: <RequireAuth />,
         children: [
-          { index: true, element: <HomeRedirect /> },
-          { path: 'objects', element: <ObjectsPage />, handle: objectsHandle },
-          { path: 'objects/:objectId', element: <ObjectPage />, handle: objectHandle },
-          { path: 'tasks/:taskId', element: <TaskPage />, handle: taskHandle },
+          { path: CHANGE_PASSWORD_PATH, element: <ChangePasswordPage /> },
           {
-            element: <RequireRole role="executor" />,
-            children: [{ path: 'my-tasks', element: <MyTasksPage />, handle: myTasksHandle }],
+            element: <AppLayout />,
+            children: [
+              {
+                errorElement: <RouteError inShell />,
+                children: [
+                  { index: true, element: <HomeRedirect /> },
+                  { path: 'objects', element: <ObjectsPage />, handle: objectsHandle },
+                  { path: 'objects/:objectId', element: <ObjectPage />, handle: objectHandle },
+                  { path: 'tasks/:taskId', element: <TaskPage />, handle: taskHandle },
+                  {
+                    element: <RequireRole role="executor" />,
+                    children: [
+                      { path: 'my-tasks', element: <MyTasksPage />, handle: myTasksHandle },
+                    ],
+                  },
+                ],
+              },
+            ],
           },
         ],
       },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
-  { path: '*', element: <NotFoundPage /> },
 ]
 
 export const router = createBrowserRouter(routes)

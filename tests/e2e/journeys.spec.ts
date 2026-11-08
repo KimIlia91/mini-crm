@@ -337,6 +337,9 @@ test.describe('review cycle', () => {
     await expect(headerStatus(executorPage, 'В работе')).toBeVisible()
     await expect(executorPage.getByRole('note', { name: 'Замечание постановщика' })).toHaveCount(0)
     await executorPage.getByRole('button', { name: 'Отправить на проверку' }).click()
+    // The history already holds an earlier «На проверке» entry, so the status text alone proves nothing:
+    // wait until the transition is applied (the button is gone) before the manager reloads.
+    await expect(executorPage.getByRole('button', { name: 'Отправить на проверку' })).toHaveCount(0)
     await expect(headerStatus(executorPage, 'На проверке')).toBeVisible()
 
     await managerPage.reload()

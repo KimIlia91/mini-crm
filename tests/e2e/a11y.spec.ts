@@ -8,6 +8,7 @@ import {
   openObjectsFiltered,
   SIDEBAR_TOGGLE,
   useDarkTheme,
+  profileButton,
   usesSidebarSheet,
 } from './app-helpers'
 import {
@@ -17,9 +18,11 @@ import {
   expect,
   expectNoA11yViolations,
   login,
+  settleAnimations,
   test,
 } from './fixtures'
 import { auditState, LONG } from './layout-helpers'
+import { bell, bellPopover, popoverItem, toastWith, watchRealtime } from './realtime-helpers'
 
 // P-items of ui-layout.md §6 that journeys.spec / layout.spec do not cover: keyboard journeys, skip
 // link, titles, landmarks and structure, focus visibility, zoom / text spacing, reduced motion and
@@ -504,7 +507,12 @@ test.describe('reduced motion (2.3.3)', () => {
     await expectStill('dialog open')
     await page.keyboard.press('Escape')
 
-    await page.getByRole('button', { name: 'Сменить тему' }).click()
+    // The theme menu is in the header on desktop and in the profile menu on phones.
+    await (
+      usesSidebarSheet(page)
+        ? profileButton(page)
+        : page.getByRole('button', { name: 'Сменить тему' })
+    ).click()
     await expect(page.getByRole('menu')).toBeVisible()
     await expectStill('menu open')
     await page.keyboard.press('Escape')
@@ -547,5 +555,145 @@ test.describe('dark theme: axe on the key screens', () => {
     await expect(executor.getByRole('table', { name: 'Мои задачи' })).toBeVisible()
     await expect(executor.locator('html')).toHaveClass(/dark/)
     await expectNoA11yViolations(executor)
+  })
+})
+
+test.describe('notifications: bell popover and toasts', () => {
+  test.use({ liveUpdates: true })
+
+  async function executorWithNotifications() {
+    const [m, a] = await Promise.all([createUser('manager', 'm'), createUser('executor', 'a')])
+    const objectId = await createObject(m, `Объект ${uid()}`)
+    const titles = [`Первая ${uid()}`, `Вторая ${uid()}`]
+    for (const title of titles) await createTask(m, objectId, a, title)
+    return { m, a, objectId, titles }
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`axe finds no serious violations with the popover open (${theme} theme)`, async ({
+      page,
+    }) => {
+      if (theme === 'dark') await useDarkTheme(page)
+      const { a, titles } = await executorWithNotifications()
+      await login(page, a)
+      if (theme === 'dark') await expect(page.locator('html')).toHaveClass(/dark/)
+      await bell(page).click()
+      await expect(bellPopover(page)).toBeVisible()
+      for (const title of titles) {
+        await expect(popoverItem(page, title)).toBeVisible()
+      }
+      await expectNoA11yViolations(page)
+      // The empty state of the same popover.
+      await bellPopover(page).getByRole('button', { name: 'Прочитать все' }).click()
+      await expect(bell(page)).toHaveAccessibleName('Уведомления')
+      await expectNoA11yViolations(page)
+    })
+
+    test(`axe finds no serious violations with a toast on screen (${theme} theme)`, async ({
+      page,
+    }) => {
+      if (theme === 'dark') await useDarkTheme(page)
+      const { m, a, objectId } = await executorWithNotifications()
+      const rt = watchRealtime(page)
+      await login(page, a)
+      await rt.ready(a)
+      const title = `Свежая ${uid()}`
+      await createTask(m, objectId, a, title)
+      const toast = toastWith(page, title)
+      await expect(toast).toBeVisible({ timeout: 10_000 })
+      await expect(toast.getByRole('button', { name: 'Открыть' })).toBeVisible()
+      await expectNoA11yViolations(page)
+    })
+  }
+
+  test('reduced motion: the popover and a toast appear without movement animations', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const { m, a, objectId } = await executorWithNotifications()
+    const rt = watchRealtime(page)
+    await login(page, a)
+    await rt.ready(a)
+
+    await bell(page).click()
+    const popover = bellPopover(page)
+    await expect(popover).toBeVisible()
+    const popoverMotion = await popover.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return {
+        duration: Math.max(...style.animationDuration.split(',').map(parseFloat)),
+        transform: style.transform,
+      }
+    })
+    expect(popoverMotion.duration, 'popover animation duration (s)').toBeLessThan(0.01)
+    await page.keyboard.press('Escape')
+
+    const title = `Свежая ${uid()}`
+    await createTask(m, objectId, a, title)
+    const toast = toastWith(page, title)
+    await expect(toast).toBeVisible({ timeout: 10_000 })
+    const running = await toast.evaluate((el) =>
+      el
+        .getAnimations({ subtree: true })
+        .filter((animation) => {
+          const timing = animation.effect?.getComputedTiming()
+          return timing !== undefined && Number(timing.duration) > 10
+        })
+        .map((animation) => animation.effect?.getComputedTiming().duration),
+    )
+    expect(running, 'no running animation longer than 10 ms inside the toast').toEqual([])
+  })
+
+  test('2.4.11: with a toast at 320 px no focus stop is fully covered by it', async ({ page }) => {
+    const { m, a, objectId } = await executorWithNotifications()
+    const rt = watchRealtime(page)
+    await page.setViewportSize({ width: 320, height: 480 })
+    await login(page, a)
+    await rt.ready(a)
+    const title = `Свежая ${uid()}`
+    await createTask(m, objectId, a, title)
+    const toast = toastWith(page, title)
+    await expect(toast).toBeVisible({ timeout: 10_000 })
+    await settleAnimations(page)
+
+    // Walk the page with Tab; every focused control outside the toast must keep a visible part
+    // (checked at its centre and four corners: one point not under the toast is enough).
+    // A stop only counts while a toast is actually on screen (it closes by itself after a few
+    // seconds), so the test cannot pass without having checked anything.
+    const obscured: string[] = []
+    let checkedWithToast = 0
+    for (let press = 0; press < 40; press++) {
+      await page.keyboard.press('Tab')
+      const verdict = await page.evaluate(() => {
+        const el = document.activeElement
+        const toaster = document.querySelector('[data-sonner-toaster]')
+        if (!toaster?.querySelector('[data-sonner-toast]')) return 'no-toast'
+        if (!el || el === document.body || toaster.contains(el)) return null
+        const r = el.getBoundingClientRect()
+        const points: [number, number][] = [
+          [r.left + r.width / 2, r.top + r.height / 2],
+          [r.left + 1, r.top + 1],
+          [r.right - 1, r.top + 1],
+          [r.left + 1, r.bottom - 1],
+          [r.right - 1, r.bottom - 1],
+        ]
+        const visible = points.some(([x, y]) => {
+          const top = document.elementFromPoint(x, y)
+          return top !== null && !toaster.contains(top)
+        })
+        return visible
+          ? 'ok'
+          : (el.getAttribute('aria-label') ?? el.textContent.trim().slice(0, 30))
+      })
+      if (verdict === 'no-toast') break
+      if (verdict === null) continue
+      checkedWithToast += 1
+      if (verdict !== 'ok') obscured.push(verdict)
+    }
+    expect(obscured, 'focused controls fully covered by the toast').toEqual([])
+    expect(
+      checkedWithToast,
+      'focus stops checked while the toast was shown',
+    ).toBeGreaterThanOrEqual(5)
   })
 })

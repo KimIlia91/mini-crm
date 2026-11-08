@@ -161,6 +161,17 @@
   html {
     scroll-padding-top: 5rem;
   }
+  /* A full-width toast at the bottom of a narrow screen must not hide the focused element or
+     the last controls (WCAG 2.4.11): reserve room for it in focus scrolling and at the end of
+     the page. Costs: a page that exactly fits the screen gains a scrollbar while a toast shows. */
+  @media screen and (max-width: 599px) {
+    html:has([data-sonner-toast]) {
+      scroll-padding-bottom: 7rem;
+    }
+    html:has([data-sonner-toast]) body {
+      padding-bottom: 7rem;
+    }
+  }
   /* Prevent iOS focus zoom. */
   @media screen and (max-width: 767px) {
     input,

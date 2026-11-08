@@ -2,11 +2,24 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, useLocation, useSearchParams } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
+import type * as SharedUi from '@/shared/ui'
+
 import { AppLayout } from './app-layout'
 
 vi.mock('@/entities/profile', () => ({ useViewer: () => ({}) }))
 vi.mock('../layout/app-header', () => ({ AppHeader: () => null }))
 vi.mock('../layout/app-sidebar', () => ({ AppSidebar: () => null }))
+vi.mock('../realtime/use-realtime-sync', () => ({ useRealtimeSync: () => undefined }))
+vi.mock('../realtime/notification-toasts', () => ({
+  useNotificationToasts: () => ({
+    onSubscribed: () => undefined,
+    onNotificationsCreated: () => undefined,
+  }),
+}))
+vi.mock('@/shared/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof SharedUi>()),
+  Toaster: () => null,
+}))
 
 function Page({ name }: { name: string }) {
   const { pathname } = useLocation()

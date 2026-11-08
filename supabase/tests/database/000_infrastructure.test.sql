@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 \ir ../helpers/auth.psql
 
-select plan(25);
+select plan(26);
 
 select has_extension('pgtap', 'pgTAP is available');
 select has_schema('private', 'private schema exists');
@@ -74,7 +74,9 @@ select is_empty(
         and p.oid::regprocedure::text <> all (array[
           'change_task_status(uuid,task_status,text)',
           'delete_task(uuid)',
-          'delete_object(uuid)'
+          'delete_object(uuid)',
+          'mark_notifications_read(uuid[])',
+          'mark_all_notifications_read()'
         ]::text[]) $$,
   'authenticated executes only allowlisted public RPCs'
 );
@@ -160,7 +162,9 @@ select is_empty(
           'private.current_app_role()',
           'private.change_task_status(uuid,task_status,text)',
           'private.delete_task(uuid)',
-          'private.delete_object(uuid)'
+          'private.delete_object(uuid)',
+          'private.mark_notifications_read(uuid[])',
+          'private.mark_all_notifications_read()'
         ]::text[]) $$,
   'authenticated executes no private function unless allowlisted'
 );
@@ -184,6 +188,12 @@ select lives_ok($$ create table private.tmp_probe (id int); create function priv
 select ok(not has_table_privilege('authenticated', 'private.tmp_probe', 'select')
           and not has_function_privilege('authenticated', 'private.tmp_fn()', 'execute'),
   'new private tables/functions are not accessible to authenticated by default');
+
+-- pg_cron grants PUBLIC EXECUTE on its functions (cron.schedule, ...); the schema itself must
+-- stay unusable for client roles, so they cannot schedule or read jobs.
+select ok(not has_schema_privilege('anon', 'cron', 'usage')
+          and not has_schema_privilege('authenticated', 'cron', 'usage'),
+  'anon/authenticated have no usage on schema cron');
 
 -- Auth context helper really switches to the client role and claims.
 select tests.authenticate_as(tests.create_user('smoke-' || gen_random_uuid() || '@example.test'));

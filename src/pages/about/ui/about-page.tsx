@@ -7,6 +7,8 @@ import { useSession } from '@/shared/auth'
 import { useDocumentTitle } from '@/shared/lib'
 import { Button, PageHeader, SkipToMain, textLinkClass } from '@/shared/ui'
 
+const AUTHOR_EMAIL = 'paterfamelias@gmail.com'
+const AUTHOR_TELEGRAM = 'Kor2710'
 const ASSIGNMENT_URL =
   'https://docs.google.com/document/d/1dpyRJ1E__eD0cisYSj0GDml4xtTTPaLe/edit?usp=sharing'
 const VIDEO_SRC = '/media/mini-crm-demo.mp4'
@@ -90,8 +92,36 @@ export function AboutPage() {
         </div>
 
         <section className="flex flex-col gap-3">
+          <h2 className={H2}>{t('author.title')}</h2>
+          <p>{t('author.intro')}</p>
+          <ul className={UL}>
+            <li>
+              {t('author.email')}:{' '}
+              <a href={`mailto:${AUTHOR_EMAIL}`} className={textLinkClass}>
+                {AUTHOR_EMAIL}
+              </a>
+            </li>
+            <li>
+              {t('author.telegram')}:{' '}
+              <a
+                href={`https://t.me/${AUTHOR_TELEGRAM}`}
+                target="_blank"
+                rel="noreferrer"
+                className={textLinkClass}
+              >
+                @{AUTHOR_TELEGRAM}
+                <ExternalLinkIcon
+                  className="ms-1 inline size-4 align-[-0.125em]"
+                  aria-hidden="true"
+                />
+                <span className="sr-only"> {t('author.newTab')}</span>
+              </a>
+            </li>
+          </ul>
+        </section>
+
+        <section className="flex flex-col gap-3">
           <h2 className={H2}>{t('video.title')}</h2>
-          <p>{t('video.description')}</p>
           <video
             controls
             preload="none"
@@ -130,6 +160,16 @@ export function AboutPage() {
           <p>{t('guide.manager.note')}</p>
           <h3 className={H3}>{t('guide.executor.title')}</h3>
           <List ordered items={t('guide.executor.steps', { returnObjects: true })} />
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2 className={H2}>{t('notifications.title')}</h2>
+          <p>{t('notifications.intro')}</p>
+          <h3 className={H3}>{t('notifications.executor.title')}</h3>
+          <List items={t('notifications.executor.items', { returnObjects: true })} />
+          <h3 className={H3}>{t('notifications.manager.title')}</h3>
+          <List items={t('notifications.manager.items', { returnObjects: true })} />
+          <List items={t('notifications.rules', { returnObjects: true })} />
         </section>
 
         <section className="flex flex-col gap-3">

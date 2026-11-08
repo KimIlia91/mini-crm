@@ -1,6 +1,16 @@
 import type { Locator, Page } from '@playwright/test'
 
-import { createObject, createTask, createUser, expect, login, test, type E2EUser } from './fixtures'
+import {
+  createObject,
+  createTask,
+  createUser,
+  expect,
+  login,
+  settleAnimations,
+  test,
+  type E2EUser,
+} from './fixtures'
+import { bell, bellPopover, toastWith, watchRealtime } from './realtime-helpers'
 import type { Database } from '../../src/shared/api/database.types'
 import {
   NAV_LABEL,
@@ -210,13 +220,18 @@ test.describe('layout: app shell', () => {
       }
 
       await auditMenu(page, vp, screen, 'profile-menu-open', profileButton(page))
-      await auditMenu(
-        page,
-        vp,
-        screen,
-        'theme-menu-open',
-        page.getByRole('button', { name: 'Сменить тему' }),
-      )
+      // On phones the theme is chosen in the profile menu (audited above); the header has no room.
+      if (usesSidebarSheet(page)) {
+        await expect(page.getByRole('button', { name: 'Сменить тему' })).toBeHidden()
+      } else {
+        await auditMenu(
+          page,
+          vp,
+          screen,
+          'theme-menu-open',
+          page.getByRole('button', { name: 'Сменить тему' }),
+        )
+      }
 
       await auditDialog({
         page,
@@ -672,5 +687,76 @@ test.describe('layout: dark theme', () => {
         dialog: page.getByRole('dialog', { name: 'Редактирование задачи' }),
       })
     })
+  })
+})
+
+test.describe('layout: notifications (bell popover and toasts)', () => {
+  test.use({ liveUpdates: true })
+
+  test('popover with long titles and a toast stay inside the viewport and off the sticky header', async ({
+    page,
+  }) => {
+    const [m, a] = await Promise.all([
+      createUser('manager', LONG.userLabel),
+      createUser('executor', LONG.userLabel),
+    ])
+    const objectId = await createObject(m, longObjectName(), LONG.address)
+    const taskId = await createTask(m, objectId, a, longTaskTitle(), LONG.description)
+    await move(a, taskId, 'in_progress')
+    await createTask(m, objectId, a, longTaskTitle())
+    await createTask(m, objectId, a, longTaskTitle())
+    const rt = watchRealtime(page)
+    await login(page, a)
+    await rt.ready(a)
+
+    for (const vp of [VIEWPORTS[0], VIEWPORTS[3]]) {
+      await resize(page, vp)
+      await expect(page.getByRole('heading', { level: 1, name: 'Мои задачи' })).toBeVisible()
+
+      await bell(page).click()
+      await expect(bellPopover(page)).toBeVisible()
+      await expect(bellPopover(page).getByRole('listitem').first()).toBeVisible()
+      const box = await bellPopover(page).boundingBox()
+      expect(box, 'popover is rendered').not.toBeNull()
+      expect(box?.x ?? -1, `popover left edge @${vp.width}`).toBeGreaterThanOrEqual(0)
+      expect(
+        (box?.x ?? 0) + (box?.width ?? 0),
+        `popover right edge @${vp.width}`,
+      ).toBeLessThanOrEqual(vp.width)
+      expect(
+        (box?.y ?? 0) + (box?.height ?? 0),
+        `popover bottom edge @${vp.width}`,
+      ).toBeLessThanOrEqual(vp.height)
+      await auditState(page, { screen: 'bell-popover', state: 'long-titles', viewport: vp })
+      await page.keyboard.press('Escape')
+      await expect(bellPopover(page)).toBeHidden()
+
+      // A fresh assignment announces itself with a toast that must not cover the header.
+      const title = longTaskTitle()
+      await createTask(m, objectId, a, title)
+      const toast = toastWith(page, title.slice(0, 20))
+      await expect(toast.first()).toBeVisible({ timeout: 15_000 })
+      await settleAnimations(page)
+      const header = await page.getByRole('banner').boundingBox()
+      const toastBox = await toast.first().boundingBox()
+      expect(header && toastBox, 'header and toast are rendered').toBeTruthy()
+      if (header && toastBox) {
+        expect(toastBox.y, `toast is below the header @${vp.width}`).toBeGreaterThanOrEqual(
+          header.y + header.height,
+        )
+        expect(toastBox.x, `toast left edge @${vp.width}`).toBeGreaterThanOrEqual(0)
+        expect(toastBox.x + toastBox.width, `toast right edge @${vp.width}`).toBeLessThanOrEqual(
+          vp.width,
+        )
+      }
+      await auditState(page, {
+        screen: 'toast',
+        state: 'long-title',
+        viewport: vp,
+        allowToastOverlay: true,
+      })
+      await page.keyboard.press('Alt+T')
+      await toast.first().getByRole('button', { name: 'Закрыть уведомление' }).click()
+    }
   })
 })

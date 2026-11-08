@@ -71,7 +71,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Start local Supabase (ephemeral, in runner)
-        run: npx supabase start -x studio,mailpit,imgproxy,logflare,vector,supavisor,edge-runtime,realtime,storage-api
+        run: npx supabase start -x studio,mailpit,imgproxy,logflare,vector,supavisor,edge-runtime,storage-api
       - name: Migration lint
         run: npm run db:lint
       - name: pgTAP (schema, RLS, privileges)

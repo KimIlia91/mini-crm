@@ -73,7 +73,10 @@ select set_eq(
             ('private.tasks_validate_assignee()'), ('private.profiles_validate_role_change()'),
             ('private.tasks_write_initial_history()'), ('private.tasks_validate_object()'),
             ('private.change_task_status(uuid,task_status,text)'),
-            ('private.delete_task(uuid)'), ('private.delete_object(uuid)') $$,
+            ('private.delete_task(uuid)'), ('private.delete_object(uuid)'),
+            ('private.tasks_broadcast()'), ('private.objects_broadcast()'),
+            ('private.tasks_notify()'), ('private.history_notify()'),
+            ('private.mark_notifications_read(uuid[])'), ('private.mark_all_notifications_read()') $$,
   'SECURITY DEFINER functions: exactly the reviewed set, all in private'
 );
 
@@ -87,7 +90,11 @@ select set_eq(
             ('private.change_task_status(uuid,task_status,text)', 'authenticated'),
             ('change_task_status(uuid,task_status,text)', 'authenticated'),
             ('private.delete_task(uuid)', 'authenticated'), ('delete_task(uuid)', 'authenticated'),
-            ('private.delete_object(uuid)', 'authenticated'), ('delete_object(uuid)', 'authenticated') $$,
+            ('private.delete_object(uuid)', 'authenticated'), ('delete_object(uuid)', 'authenticated'),
+            ('private.mark_notifications_read(uuid[])', 'authenticated'),
+            ('mark_notifications_read(uuid[])', 'authenticated'),
+            ('private.mark_all_notifications_read()', 'authenticated'),
+            ('mark_all_notifications_read()', 'authenticated') $$,
   'EXECUTE for anon/authenticated: exactly the reviewed private helpers and public RPCs, authenticated only'
 );
 
