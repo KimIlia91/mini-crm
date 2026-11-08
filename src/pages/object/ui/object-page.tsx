@@ -113,7 +113,7 @@ export function ObjectPage() {
   if (object.isPending) {
     return <PageLoader />
   }
-  if (object.isError) {
+  if (object.isError && object.data === undefined) {
     return (
       <RetryAlert
         text={t('loadError')}

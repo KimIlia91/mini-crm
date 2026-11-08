@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -42,7 +42,9 @@ function renderPage(
   role: Viewer['role'],
   { object = OBJECT, tasks = TASKS }: { object?: typeof OBJECT | null; tasks?: typeof TASKS } = {},
 ) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: Infinity, retry: false } },
+  })
   const viewer: Viewer = { id: 'u1', role, fullName: 'Тест', mustChangePassword: false }
   queryClient.setQueryData(profileKeys.byId('u1'), viewer)
   queryClient.setQueryData(objectKeys.detail('o1'), object)
@@ -50,7 +52,7 @@ function renderPage(
     rows: tasks,
     total: tasks.length,
   })
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <SessionContext value={{ status: 'signed-in', userId: 'u1' }}>
         <MemoryRouter initialEntries={['/objects/o1']}>
@@ -61,6 +63,7 @@ function renderPage(
       </SessionContext>
     </QueryClientProvider>,
   )
+  return { ...view, queryClient }
 }
 
 describe('ObjectPage', () => {
@@ -91,6 +94,27 @@ describe('ObjectPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Действия с объектом' }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Удалить' }))
     expect(await screen.findByRole('alertdialog', { name: 'Удалить объект?' })).toBeInTheDocument()
+  })
+
+  it('keeps the open edit form and its input when a background refetch fails', async () => {
+    const { queryClient } = renderPage('manager')
+    await userEvent.click(screen.getByRole('button', { name: 'Действия с объектом' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Редактировать' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Редактировать объект' })
+    await userEvent.type(within(dialog).getByLabelText('Адрес'), ', корп. 2')
+
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: objectKeys.detail('o1') })
+      // TanStack Query notifies observers on the next macrotask.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(queryClient.getQueryState(objectKeys.detail('o1'))?.status).toBe('error')
+
+    const stillOpen = screen.getByRole('dialog', { name: 'Редактировать объект' })
+    expect(within(stillOpen).getByLabelText('Адрес')).toHaveValue('ул. Ленина, 1, корп. 2')
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Склад №1', hidden: true }),
+    ).toBeInTheDocument()
   })
 
   it('shows the executor the object and tasks without manage controls', async () => {

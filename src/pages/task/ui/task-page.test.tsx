@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -56,7 +56,9 @@ const HISTORY = [
 ]
 
 function renderPage(role: Viewer['role'], task: ReturnType<typeof taskRow> | null) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: Infinity, retry: false } },
+  })
   const viewer: Viewer = {
     id: role === 'manager' ? 'm1' : 'e1',
     role,
@@ -67,7 +69,7 @@ function renderPage(role: Viewer['role'], task: ReturnType<typeof taskRow> | nul
   queryClient.setQueryData(taskKeys.detail('t1'), task)
   queryClient.setQueryData(taskKeys.history('t1'), HISTORY)
   queryClient.setQueryData(transitionKeys.all, [])
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <SessionContext value={{ status: 'signed-in', userId: viewer.id }}>
         <MemoryRouter initialEntries={['/tasks/t1']}>
@@ -78,6 +80,7 @@ function renderPage(role: Viewer['role'], task: ReturnType<typeof taskRow> | nul
       </SessionContext>
     </QueryClientProvider>,
   )
+  return { ...view, queryClient }
 }
 
 describe('TaskPage', () => {
@@ -100,6 +103,28 @@ describe('TaskPage', () => {
     expect(screen.getByRole('menuitem', { name: 'Удалить' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Редактировать' }))
     expect(await screen.findByRole('dialog', { name: 'Редактирование задачи' })).toBeInTheDocument()
+  })
+
+  it('keeps the open edit form and its input when a background refetch fails', async () => {
+    const { queryClient } = renderPage('manager', taskRow('in_review'))
+    await userEvent.click(screen.getByRole('button', { name: 'Действия с задачей' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Редактировать' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Редактирование задачи' })
+    const title = within(dialog).getByLabelText('Название')
+    await userEvent.type(title, ' срочно')
+
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: taskKeys.detail('t1') })
+      // TanStack Query notifies observers on the next macrotask.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(queryClient.getQueryState(taskKeys.detail('t1'))?.status).toBe('error')
+
+    const stillOpen = screen.getByRole('dialog', { name: 'Редактирование задачи' })
+    expect(within(stillOpen).getByLabelText('Название')).toHaveValue('Проверить проводку срочно')
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Проверить проводку', hidden: true }),
+    ).toBeInTheDocument()
   })
 
   it('opens the delete confirmation from the actions menu', async () => {

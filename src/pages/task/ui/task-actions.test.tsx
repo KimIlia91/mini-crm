@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -46,7 +46,9 @@ function renderActions(
   assigneeId = 'exec-1',
 ) {
   // Rules are seeded in the cache (staleTime Infinity), so no request is made.
-  const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: 0 } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } },
+  })
   queryClient.setQueryData(transitionKeys.all, rules)
   const ui = (current: TaskStatus) => (
     <QueryClientProvider client={queryClient}>
@@ -56,6 +58,7 @@ function renderActions(
   const view = render(ui(status))
   return {
     ...view,
+    queryClient,
     setStatus: (next: TaskStatus) => {
       view.rerender(ui(next))
     },
@@ -118,6 +121,23 @@ describe('TaskActions', () => {
     expect(dialog).toBeInTheDocument()
     expect(await screen.findByText('Укажите комментарий')).toBeInTheDocument()
     expect(api.rpc).not.toHaveBeenCalled()
+  })
+
+  it('keeps the open rework comment when a background refetch of the rules fails', async () => {
+    const { queryClient } = renderActions('in_review', MANAGER)
+    await userEvent.click(screen.getByRole('button', { name: 'Вернуть на доработку' }))
+    await userEvent.type(await screen.findByLabelText('Комментарий'), 'Нет фото')
+
+    // The mocked client has no `from`, so the refetch fails while the cached rules stay.
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: transitionKeys.all })
+      // TanStack Query notifies observers on the next macrotask.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(queryClient.getQueryState(transitionKeys.all)?.status).toBe('error')
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByLabelText('Комментарий')).toHaveValue('Нет фото')
   })
 
   it('treats a whitespace-only comment as empty', async () => {

@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { profileQueries } from '@/entities/profile'
 
 import { expectNoAxeViolations } from '../../../../tests/setup/axe'
 import { TaskFormDialog } from './task-form-dialog'
@@ -54,11 +56,12 @@ function renderDialog(props: Parameters<typeof TaskFormDialog>[0]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <TaskFormDialog {...props} />
     </QueryClientProvider>,
   )
+  return { ...view, queryClient }
 }
 
 async function openCreate() {
@@ -92,6 +95,25 @@ describe('TaskFormDialog', () => {
     expect(await within(dialog).findByText(/Не удалось загрузить исполнителей/)).toBeVisible()
     expect(within(dialog).getByRole('button', { name: 'Повторить' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Создать' })).toBeDisabled()
+  })
+
+  it('keeps the assignee select when a background refetch of executors fails', async () => {
+    db.results.profiles = EXECUTORS
+    const { queryClient } = renderDialog({ mode: 'create', objectId: 'o1' })
+    await userEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByRole('combobox', { name: 'Исполнитель' })).toBeInTheDocument()
+
+    db.results.profiles = { data: null, error: { code: 'XX000', message: 'boom' } }
+    await act(async () => {
+      await queryClient.invalidateQueries()
+      // TanStack Query notifies observers on the next macrotask.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(queryClient.getQueryState(profileQueries.executors().queryKey)?.status).toBe('error')
+
+    expect(within(dialog).getByRole('combobox', { name: 'Исполнитель' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Создать' })).toBeEnabled()
   })
 
   it('shows an empty state when there are no executors', async () => {

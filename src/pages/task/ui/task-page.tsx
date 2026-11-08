@@ -58,7 +58,7 @@ export function TaskPage() {
   if (task.isPending) {
     return <PageLoader />
   }
-  if (task.isError) {
+  if (task.isError && task.data === undefined) {
     return (
       <Alert variant="destructive" role="alert">
         <AlertDescription className="flex flex-wrap items-center gap-2">

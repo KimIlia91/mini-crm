@@ -30,7 +30,8 @@ export function TaskActions({ task, viewer }: TaskActionsProps) {
   const change = useChangeTaskStatus()
 
   if (rules.isPending) return <Skeleton className="h-9 w-40" />
-  if (rules.isError) {
+  // A failed background refetch keeps the cached rules, so the open comment dialog stays mounted.
+  if (rules.isError && rules.data === undefined) {
     return (
       <Alert variant="destructive" role="alert" className="w-72 max-w-full">
         <AlertDescription className="flex flex-wrap items-center gap-2">

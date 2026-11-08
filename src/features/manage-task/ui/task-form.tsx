@@ -63,7 +63,9 @@ export function TaskForm({
     return key ? t(key) : undefined
   }
 
-  const noExecutors = executors.isSuccess && executors.data.length === 0
+  // Cached executors stay usable when a background refetch fails; the error shows only without data.
+  const executorList = executors.data
+  const noExecutors = executorList?.length === 0
 
   return (
     <form
@@ -106,7 +108,7 @@ export function TaskForm({
         <Field data-invalid={errors.assigneeId ? true : undefined} className="gap-1.5">
           <FieldLabel htmlFor="task-assignee">{t('form.assignee')}</FieldLabel>
           {executors.isPending ? <Skeleton className="h-9 w-full" /> : null}
-          {executors.isError ? (
+          {executors.isError && executorList === undefined ? (
             <Alert variant="destructive" role="alert">
               <AlertDescription className="flex items-center justify-between gap-2">
                 {t('form.executorsError')}
@@ -126,7 +128,7 @@ export function TaskForm({
           {noExecutors ? (
             <p className="text-sm text-muted-foreground">{t('form.noExecutors')}</p>
           ) : null}
-          {executors.isSuccess && !noExecutors ? (
+          {executorList && !noExecutors ? (
             <Controller
               control={control}
               name="assigneeId"
@@ -142,14 +144,14 @@ export function TaskForm({
                   >
                     <SelectValue
                       placeholder={t('form.assigneePlaceholder')}
-                      title={executors.data.find((item) => item.id === field.value)?.fullName}
+                      title={executorList.find((item) => item.id === field.value)?.fullName}
                     />
                   </SelectTrigger>
                   <SelectContent
                     position="popper"
                     className="max-h-[min(18rem,var(--radix-select-content-available-height))]"
                   >
-                    {executors.data.map((executor) => (
+                    {executorList.map((executor) => (
                       <SelectItem
                         key={executor.id}
                         value={executor.id}
@@ -167,7 +169,7 @@ export function TaskForm({
         </Field>
       </FieldGroup>
       <SheetFooter>
-        <Button type="submit" disabled={isPending || !executors.isSuccess || noExecutors}>
+        <Button type="submit" disabled={isPending || executorList === undefined || noExecutors}>
           {isPending ? <Spinner data-icon="inline-start" /> : null}
           {submitLabel}
         </Button>
