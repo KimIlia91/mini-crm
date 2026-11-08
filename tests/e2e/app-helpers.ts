@@ -1,6 +1,6 @@
 import type { Browser, Locator, Page } from '@playwright/test'
 
-import { expect, test } from './fixtures'
+import { blockRealtime, expect, test } from './fixtures'
 
 /** Below this width the sidebar is a sheet opened with the header button (md breakpoint of the app). */
 const SIDEBAR_SHEET_MAX_WIDTH = 768
@@ -11,7 +11,10 @@ export const SIDEBAR_TOGGLE = 'Переключить боковую панел�
 export const mainNav = (page: Page): Locator => page.getByRole('navigation', { name: NAV_LABEL })
 
 /** A fresh browser context with the same device settings as the current project (desktop / mobile). */
-export async function newUserPage(browser: Browser): Promise<Page> {
+export async function newUserPage(
+  browser: Browser,
+  { live = false }: { live?: boolean } = {},
+): Promise<Page> {
   const { baseURL, viewport, userAgent, deviceScaleFactor, isMobile, hasTouch } =
     test.info().project.use
   const context = await browser.newContext({
@@ -22,6 +25,7 @@ export async function newUserPage(browser: Browser): Promise<Page> {
     ...(isMobile !== undefined ? { isMobile } : {}),
     ...(hasTouch !== undefined ? { hasTouch } : {}),
   })
+  if (!live) await blockRealtime(context)
   return context.newPage()
 }
 

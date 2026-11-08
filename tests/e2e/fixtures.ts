@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import AxeBuilder from '@axe-core/playwright'
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 import { getLocalSupabaseAdminEnv } from '../../scripts/supabase-env.mjs'
@@ -142,7 +142,27 @@ export async function login(
   if (expectSuccess) await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
 }
 
-export const test = base.extend<{ supabaseUrl: string; supabasePublishableKey: string }>({
+/**
+ * The local database is shared by every parallel test, and every manager is notified of every
+ * review / object change. Without isolation, other tests' events would pop toasts over this test's
+ * screen and refetch its lists mid-measurement. So realtime is cut off by default (the socket
+ * never opens a session); tests about live updates opt in with `test.use({ liveUpdates: true })`
+ * or by creating their contexts through `liveSession`.
+ */
+export async function blockRealtime(context: BrowserContext): Promise<void> {
+  await context.routeWebSocket(/\/realtime\/v1\/websocket/, () => undefined)
+}
+
+export const test = base.extend<{
+  supabaseUrl: string
+  supabasePublishableKey: string
+  liveUpdates: boolean
+}>({
+  liveUpdates: [false, { option: true }],
+  context: async ({ context, liveUpdates }, run) => {
+    if (!liveUpdates) await blockRealtime(context)
+    await run(context)
+  },
   supabaseUrl: [process.env.E2E_SUPABASE_URL ?? '', { option: true }],
   supabasePublishableKey: [process.env.E2E_SUPABASE_PUBLISHABLE_KEY ?? '', { option: true }],
 })

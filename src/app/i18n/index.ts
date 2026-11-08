@@ -1,3 +1,4 @@
+import { entityNotificationRu } from '@/entities/notification'
 import { entityTaskRu } from '@/entities/task'
 import { manageObjectRu } from '@/features/manage-object'
 import { manageTaskRu } from '@/features/manage-task'
@@ -17,6 +18,7 @@ import { layoutRu } from './ru-layout'
 export const resources = {
   common: commonRu,
   layout: layoutRu,
+  'entity-notification': entityNotificationRu,
   'entity-task': entityTaskRu,
   'manage-object': manageObjectRu,
   'manage-task': manageTaskRu,

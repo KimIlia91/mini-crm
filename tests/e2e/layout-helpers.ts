@@ -33,7 +33,7 @@ export const LONG = {
 }
 
 /** Runs inside the page; returns human-readable violations for the current DOM. */
-function collectInvariantViolations(): string[] {
+function collectInvariantViolations(allowToastOverlay: boolean): string[] {
   const out: string[] = []
   const vw = document.documentElement.clientWidth
   const vh = window.innerHeight
@@ -167,12 +167,19 @@ function collectInvariantViolations(): string[] {
     el.scrollIntoView({ block: 'center', inline: 'nearest' })
     const c = el.getBoundingClientRect()
     const top = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2)
+    // Only with allowToastOverlay (toast cases): a toast is a transient, dismissible overlay, so content
+    // under it is covered on purpose. Anywhere else a toast covering a target still fails.
+    const underToast =
+      allowToastOverlay &&
+      top?.closest('[data-sonner-toaster]') != null &&
+      !el.closest('[data-sonner-toaster]')
     const ok =
-      top !== null &&
-      (top === el ||
-        el.contains(top) ||
-        (top.contains(el) && top !== document.body && top !== document.documentElement) ||
-        top.closest<HTMLLabelElement>('label')?.control === el)
+      underToast ||
+      (top !== null &&
+        (top === el ||
+          el.contains(top) ||
+          (top.contains(el) && top !== document.body && top !== document.documentElement) ||
+          top.closest<HTMLLabelElement>('label')?.control === el))
     if (!ok) {
       out.push(
         `${top ? `target covered at its center by ${describe(top)}` : 'target unreachable (center outside the viewport, not scrollable into view)'}: ${describe(el)}`,
@@ -189,6 +196,8 @@ export interface SnapOptions {
   viewport: { width: number; height: number }
   /** Run axe too (every key page and every dialog state). */
   axe?: boolean
+  /** Toast cases only: do not report page content that the shown toast covers. Off by default. */
+  allowToastOverlay?: boolean
 }
 
 /**
@@ -200,7 +209,10 @@ export async function auditState(page: Page, opts: SnapOptions): Promise<void> {
   const name = `${opts.screen}-${opts.state}-${opts.viewport.width}`
   const where = `[${opts.screen} / ${opts.state} @ ${opts.viewport.width}x${opts.viewport.height}] screenshot test-results/layout/${name}.png`
   await page.screenshot({ path: `test-results/layout/${name}.png`, fullPage: true })
-  const violations = await page.evaluate(collectInvariantViolations)
+  const violations = await page.evaluate(
+    collectInvariantViolations,
+    opts.allowToastOverlay ?? false,
+  )
   if (opts.axe !== false) {
     try {
       await expectNoA11yViolations(page)

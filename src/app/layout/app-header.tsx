@@ -10,6 +10,7 @@ import { ThemeSwitch } from '@/shared/theme'
 import { BreadcrumbTrail, BreadcrumbTrailHost, Separator, SidebarTrigger } from '@/shared/ui'
 
 import { isRouteHandle } from '../routes/route-handle'
+import { NotificationsMenu } from './notifications-menu'
 import { ProfileDropdown } from './profile-dropdown'
 
 /** Breadcrumbs of the deepest matched route that declares them. */
@@ -43,7 +44,11 @@ export function AppHeader({ viewer }: { viewer: Viewer }) {
         <Breadcrumbs />
       </BreadcrumbTrailHost>
       <div className="ms-auto flex shrink-0 items-center gap-1">
-        <ThemeSwitch />
+        <NotificationsMenu />
+        {/* On phones the row does not fit at 200 % text zoom; the theme stays in the profile menu. */}
+        <div className="contents max-md:hidden">
+          <ThemeSwitch />
+        </div>
         <ProfileDropdown viewer={viewer} />
       </div>
     </header>

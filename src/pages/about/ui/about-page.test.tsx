@@ -27,10 +27,12 @@ describe('AboutPage', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     expect(screen.getByRole('heading', { level: 1, name: 'О проекте' })).toBeInTheDocument()
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Автор',
       'Видео-обзор',
       'Роли',
       'Путь задачи',
       'Как работать',
+      'Обновления и уведомления',
       'Как устроено',
       'Как защищены данные',
       'Решения и допущения',
@@ -41,8 +43,23 @@ describe('AboutPage', () => {
       'Чего не может исполнитель',
       'Постановщик',
       'Исполнитель',
+      'Что приходит исполнителю',
+      'Что приходит постановщику',
       'Чего нет',
     ])
+  })
+
+  it('describes live updates and notifications', () => {
+    renderAbout(SIGNED_OUT)
+    expect(screen.getByText(/появляются на экране без перезагрузки/)).toBeInTheDocument()
+    expect(screen.getByText('Задачу передали другому исполнителю.')).toBeInTheDocument()
+    expect(screen.getByText('Исполнитель отправил задачу на проверку.')).toBeInTheDocument()
+    expect(screen.getByText(/Принята: имя/)).toBeInTheDocument()
+    expect(screen.getByText(/Комментарий постановщика к возврату/)).toBeInTheDocument()
+    expect(screen.getByText(/Supabase Realtime/)).toBeInTheDocument()
+    expect(screen.getByText(/в любом случае в течение минуты/)).toBeInTheDocument()
+    expect(screen.getByText(/старше 90 дней/)).toBeInTheDocument()
+    expect(screen.getByText(/push-сообщений и писем нет/)).toBeInTheDocument()
   })
 
   it('offers «Войти» to /login when signed out', () => {
@@ -93,9 +110,19 @@ describe('AboutPage', () => {
     expect(link).toHaveAccessibleName(/откроется в новой вкладке/)
   })
 
-  it('publishes no email address', () => {
+  it('publishes only the author contacts, no demo login', () => {
     const { container } = renderAbout(SIGNED_OUT)
-    expect(container.textContent).not.toContain('@')
+    expect(container.textContent).not.toMatch(/@example\.(com|test)/)
+    expect(screen.getByRole('heading', { level: 2, name: 'Автор' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /paterfamelias@gmail\.com/ })).toHaveAttribute(
+      'href',
+      'mailto:paterfamelias@gmail.com',
+    )
+    const telegram = screen.getByRole('link', { name: /@Kor2710/ })
+    expect(telegram).toHaveAttribute('href', 'https://t.me/Kor2710')
+    expect(telegram).toHaveAttribute('target', '_blank')
+    expect(telegram).toHaveAttribute('rel', 'noreferrer')
+    expect(telegram).toHaveAccessibleName(/откроется в новой вкладке/)
   })
 
   it('sets the document title', () => {

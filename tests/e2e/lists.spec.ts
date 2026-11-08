@@ -296,18 +296,20 @@ for (const list of listCases) {
         const search = page.getByRole('searchbox', { name: list.search })
         await expect(search).toBeVisible()
         await expect(page.getByRole('table', { name: list.table })).toBeVisible()
-        // The list has settled; count only the requests caused by typing.
+        // The list has settled; count only the search requests caused by typing. A late
+        // neighbour-page prefetch of the unfiltered list carries no `ilike` and is not counted.
+        const isSearch = (r: ListRequest) => decodeURIComponent(r.url.search).includes('ilike')
         const requests = trackListRequests(page)
         await search.pressSequentially(token.slice(0, 5), { delay: 40 })
         await expect(search).toHaveValue(token.slice(0, 5))
         await expect
-          .poll(() => requests.length, { message: 'search reached the server' })
+          .poll(() => requests.filter(isSearch).length, { message: 'search reached the server' })
           .toBeGreaterThan(0)
         await expect(page.getByRole('table', { name: list.table })).toBeVisible()
         await expect(pageStatus(page, 1, 1)).toBeVisible()
         expect(
-          requests.map((r) => r.url.search),
-          'exactly one request for five keystrokes',
+          requests.filter(isSearch).map((r) => r.url.search),
+          'exactly one search request for five keystrokes',
         ).toHaveLength(1)
       } finally {
         await cleanup()

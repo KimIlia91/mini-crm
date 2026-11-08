@@ -23,6 +23,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      notifications: {
+        Row: {
+          actor_id: string | null
+          comment: string | null
+          created_at: string
+          id: string
+          kind: Database['public']['Enums']['notification_kind']
+          read_at: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          task_id: string
+          title_snapshot: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          actor_id?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          kind: Database['public']['Enums']['notification_kind']
+          read_at?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          task_id: string
+          title_snapshot: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database['public']['Enums']['notification_kind']
+          read_at?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          task_id?: string
+          title_snapshot?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'notifications_actor_id_fkey'
+            columns: ['actor_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'notifications_resolved_by_fkey'
+            columns: ['resolved_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'notifications_task_id_fkey'
+            columns: ['task_id']
+            isOneToOne: false
+            referencedRelation: 'tasks'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'notifications_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       objects: {
         Row: {
           address: string
@@ -242,9 +317,19 @@ export type Database = {
       }
       delete_object: { Args: { p_object_id: string }; Returns: undefined }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
+      mark_all_notifications_read: { Args: Record<PropertyKey, never>; Returns: undefined }
+      mark_notifications_read: { Args: { p_ids: string[] }; Returns: undefined }
     }
     Enums: {
       app_role: 'manager' | 'executor'
+      notification_kind:
+        | 'task_assigned'
+        | 'task_unassigned'
+        | 'task_deleted'
+        | 'task_rework'
+        | 'task_accepted'
+        | 'task_in_progress'
+        | 'task_in_review'
       task_status: 'new' | 'in_progress' | 'in_review' | 'accepted' | 'rework'
     }
     CompositeTypes: {
@@ -361,6 +446,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ['manager', 'executor'],
+      notification_kind: [
+        'task_assigned',
+        'task_unassigned',
+        'task_deleted',
+        'task_rework',
+        'task_accepted',
+        'task_in_progress',
+        'task_in_review',
+      ],
       task_status: ['new', 'in_progress', 'in_review', 'accepted', 'rework'],
     },
   },

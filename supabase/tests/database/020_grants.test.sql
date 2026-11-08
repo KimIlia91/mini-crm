@@ -20,7 +20,8 @@ select set_eq(
             ('objects', 'SELECT'),
             ('tasks', 'SELECT'),
             ('task_status_history', 'SELECT'),
-            ('task_transitions', 'SELECT') $$,
+            ('task_transitions', 'SELECT'),
+            ('notifications', 'SELECT') $$,
   'authenticated: exact table-level privileges in public (insert/update only per column, no DELETE)'
 );
 

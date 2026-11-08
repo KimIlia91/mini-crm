@@ -124,6 +124,8 @@ test.describe('no data requests and lazy video', () => {
     expect(signedOut.filter((u) => u.includes('/rest/v1/'))).toEqual([])
 
     await login(page, m)
+    // Sign-in lands on /objects; its list request must not be counted as a request of /about.
+    await page.waitForLoadState('networkidle')
     const signedIn = trackRequests(page)
     await page.goto('/about')
     await expect(h1(page)).toBeVisible()
@@ -296,9 +298,13 @@ test.describe('keyboard', () => {
     await page.keyboard.press('Enter')
     const item = page.getByRole('menuitem', { name: 'О проекте' })
     await expect(item).toBeVisible()
+    // Focus moves a moment after the key press: wait for it, or a fast loop presses past the item.
+    const focusedText = () => page.evaluate(() => document.activeElement?.textContent ?? '')
     for (let i = 0; i < 10; i++) {
       if (await item.evaluate((el) => el === document.activeElement)) break
+      const before = await focusedText()
       await page.keyboard.press('ArrowDown')
+      await expect.poll(focusedText, { message: 'ArrowDown moves the focus' }).not.toBe(before)
     }
     await expect(item).toBeFocused()
     await page.keyboard.press('Enter')
@@ -327,14 +333,25 @@ test.describe('structure and accessibility', () => {
     })
     const h2 = await page.getByRole('heading', { level: 2 }).allTextContents()
     expect(h2).toEqual([
+      'Автор',
       'Видео-обзор',
       'Роли',
       'Путь задачи',
       'Как работать',
+      'Обновления и уведомления',
       'Как устроено',
       'Как защищены данные',
       'Решения и допущения',
     ])
+
+    const author = page.getByRole('main')
+    await expect(author.getByRole('link', { name: /paterfamelias@gmail.com/ })).toHaveAttribute(
+      'href',
+      'mailto:paterfamelias@gmail.com',
+    )
+    const telegram = author.getByRole('link', { name: /Kor2710/ })
+    await expect(telegram).toHaveAttribute('href', 'https://t.me/Kor2710')
+    await expect(telegram).toHaveAttribute('target', '_blank')
   })
 
   test('axe in the light theme, signed out and signed in', async ({ page }) => {
