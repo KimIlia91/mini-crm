@@ -31,6 +31,7 @@
     "db:lint": "supabase db lint --level warning --fail-on warning",
     "db:types": "supabase gen types --lang typescript > src/shared/api/database.types.ts && prettier --write src/shared/api/database.types.ts",
     "db:status": "node scripts/supabase-env.mjs status",
+    "db:clean:test": "node scripts/clean-test-data.mjs",
     "db:seed:demo": "node scripts/seed-demo.mjs",
     "env:local": "node scripts/supabase-env.mjs env-local"
   },
