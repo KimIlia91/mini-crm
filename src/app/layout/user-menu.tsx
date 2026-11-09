@@ -55,12 +55,7 @@ export function UserMenuContent({ viewer, side = 'bottom', onSignOut }: UserMenu
   const { t: tc } = useTranslation('common')
   const { theme, setTheme } = useTheme()
   return (
-    <DropdownMenuContent
-      align="end"
-      side={side}
-      sideOffset={4}
-      className="max-w-[calc(100vw-1rem)] min-w-56 rounded-lg"
-    >
+    <DropdownMenuContent align="end" side={side} sideOffset={4} className="min-w-56 rounded-lg">
       <DropdownMenuLabel className="flex items-center gap-2 px-1 py-1.5 font-normal">
         <UserSummary viewer={viewer} />
       </DropdownMenuLabel>

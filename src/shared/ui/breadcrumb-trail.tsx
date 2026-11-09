@@ -1,8 +1,8 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { createContext, use, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
-import { CheckIcon, ChevronRightIcon, ChevronsUpDownIcon } from 'lucide-react'
+import { ChevronRightIcon, ChevronsUpDownIcon, type LucideIcon } from 'lucide-react'
 
 import { Breadcrumb, BreadcrumbList, BreadcrumbPage } from './breadcrumb'
 import { Button } from './button'
@@ -12,29 +12,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './dropdown-menu'
+import { LeavingGuard } from './leaving-guard'
 import { Skeleton } from './skeleton'
 
 export interface BreadcrumbTrailItem {
-  /** Stable id of the path segment (`objects`, `object:<id>`, `task:<id>`): the same on every route. */
   id: string
-  /** Shown text (and `title`). Omit together with `loading`. */
   label?: string
-  /** Omitted for the current page (always the last item). */
   to?: string
-  /** The name is still loading: a fixed-width placeholder instead of a text that would change. */
   loading?: boolean
-  /**
-   * With `loading`: the segment is not known yet; keep what the previous route showed at this place
-   * (e.g. the object while one of its tasks loads) instead of a placeholder.
-   */
   keepPrevious?: boolean
+  icon?: LucideIcon
 }
 
-// A block with its own max width, so the ellipsis is drawn (an inline link would just cut the text).
-// The same for every crumb: a crumb's width must not change when it stops being the last one.
 const CRUMB_TEXT = 'block max-w-36 truncate md:max-w-56'
 
-/** Soft ease-out; appearing and disappearing use the same curve and length (500 ms, shift 12 px). */
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 const DURATION = 0.5
 const SHIFT = 12
@@ -50,18 +41,17 @@ function sameItems(a: readonly BreadcrumbTrailItem[], b: readonly BreadcrumbTrai
         item.label === other.label &&
         item.to === other.to &&
         item.loading === other.loading &&
-        item.keepPrevious === other.keepPrevious
+        item.keepPrevious === other.keepPrevious &&
+        item.icon === other.icon
       )
     })
   )
 }
 
-/** A crumb with the React key it keeps for as long as it stays on screen. */
 type ResolvedItem = BreadcrumbTrailItem & { key: string }
 
 interface TrailState {
   items: readonly ResolvedItem[]
-  /** Position among the crumbs that are new in this update (0 = first), for the entrance cascade. */
   entering: Readonly<Record<string, number>>
 }
 
@@ -73,12 +63,10 @@ function nextState(previous: TrailState, incoming: readonly BreadcrumbTrailItem[
     const sameId = previous.items.find((known) => known.id === item.id)
     if (item.loading) {
       if (item.keepPrevious && before && !before.loading) return before
-      // A name that was already shown is not taken back while the next page reloads it.
       const shown = previous.items.find((known) => known.id === item.id && !known.loading)
       return shown ?? { ...item, key: sameId?.key ?? item.id }
     }
     if (sameId) return { ...item, key: sameId.key }
-    // The placeholder of this place gets its real content: the same crumb, not a new one.
     if (before?.loading && before.keepPrevious) return { ...item, key: before.key }
     return { ...item, key: item.id }
   })
@@ -113,7 +101,6 @@ export function BreadcrumbTrailHost({ children }: { children?: React.ReactNode }
 /** A route's crumbs; renders nothing itself — the surrounding `BreadcrumbTrailHost` shows them. */
 export function BreadcrumbTrail({ items }: { items: readonly BreadcrumbTrailItem[] }) {
   const publish = use(PublishItems)
-  // Callers build a new array on every render: publish only when its content changes.
   const [stable, setStable] = useState(items)
   if (!sameItems(stable, items)) setStable(items)
   useEffect(() => {
@@ -125,16 +112,6 @@ export function BreadcrumbTrail({ items }: { items: readonly BreadcrumbTrailItem
 function useMotionParams() {
   const reduce = useReducedMotion() === true
   return { shift: reduce ? 0 : SHIFT, duration: reduce ? 0 : DURATION }
-}
-
-/** A crumb that is fading out is already gone for keyboard and assistive technology: not focusable, not announced. */
-function LeavingGuard({ children }: { children: React.ReactNode }) {
-  const isPresent = useIsPresent()
-  return (
-    <div inert={!isPresent} aria-hidden={!isPresent || undefined} className="contents">
-      {children}
-    </div>
-  )
 }
 
 function CrumbContent({ item, isLast }: { item: BreadcrumbTrailItem; isLast: boolean }) {
@@ -170,14 +147,12 @@ function TrailView({ state }: { state: TrailState }) {
       {items.length > 0 ? (
         <Breadcrumb className="min-w-0 max-md:hidden">
           <BreadcrumbList className="relative flex-nowrap">
-            {/* popLayout: a leaving crumb stops taking room, so the others never get pushed. */}
             <AnimatePresence initial={false} mode="popLayout">
               {items.map((item, index) => (
                 <motion.li
                   key={item.key}
                   layout="position"
                   data-slot="breadcrumb-item"
-                  // Clipped box: the sliding content never reaches the neighbouring crumbs.
                   className="inline-flex min-w-0 overflow-clip [overflow-clip-margin:4px]"
                   initial={{ opacity: 0 }}
                   animate={{
@@ -188,7 +163,6 @@ function TrailView({ state }: { state: TrailState }) {
                       delay: duration === 0 ? 0 : (entering[item.key] ?? 0) * STEP,
                     },
                   }}
-                  // The last crumb leaves first: the cascade runs backwards.
                   exit={{
                     opacity: 0,
                     transition: {
@@ -225,7 +199,6 @@ function TrailView({ state }: { state: TrailState }) {
                           className="size-3.5 shrink-0 text-muted-foreground"
                         />
                       ) : null}
-                      {/* Same crumb, new content (placeholder -> name): cross-fade inside, no new item. */}
                       <AnimatePresence initial={false} mode="popLayout">
                         <motion.span
                           key={item.loading ? 'loading' : 'ready'}
@@ -259,7 +232,7 @@ function PathMenu({ items }: { items: readonly BreadcrumbTrailItem[] }) {
   const currentLabel = current.label ?? ''
 
   const text = (
-    <span className="relative block min-w-0 flex-1 text-start">
+    <span className="relative block min-w-0 flex-1 text-center">
       <AnimatePresence initial={false} mode="popLayout">
         <motion.span
           key={`${current.id}:${current.loading ? 'loading' : 'ready'}`}
@@ -276,7 +249,11 @@ function PathMenu({ items }: { items: readonly BreadcrumbTrailItem[] }) {
   )
 
   if (lastIndex === 0) {
-    return <span className="block min-w-0 shrink text-sm font-medium md:hidden">{text}</span>
+    return (
+      <span className="block min-w-0 flex-1 px-2 text-center text-sm font-medium md:hidden">
+        {text}
+      </span>
+    )
   }
 
   return (
@@ -284,40 +261,53 @@ function PathMenu({ items }: { items: readonly BreadcrumbTrailItem[] }) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="min-h-11 max-w-full min-w-0 shrink justify-start gap-1 px-2 md:hidden"
+          className="min-h-11 min-w-0 flex-1 gap-1 px-2 md:hidden"
           aria-label={t('breadcrumb.showPath', { label: currentLabel })}
         >
+          <span aria-hidden="true" className="size-4 shrink-0" />
           {text}
           <ChevronsUpDownIcon aria-hidden="true" className="text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[min(20rem,calc(100vw-2rem))]">
+      <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] p-1.5">
         {items.map((item, index) => {
           const isCurrent = index === lastIndex
           const label = item.label ?? ''
-          const indent = { paddingInlineStart: `${String(0.5 + index * 0.75)}rem` }
-          const body = item.loading ? (
-            <Skeleton className="h-4 w-24 rounded" />
-          ) : (
-            <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]" title={label}>
-              {label}
-            </span>
+          const Icon = item.icon
+          const body = (
+            <>
+              {Icon ? (
+                <Icon
+                  aria-hidden="true"
+                  className={isCurrent ? 'text-primary' : 'text-muted-foreground'}
+                />
+              ) : null}
+              {item.loading ? (
+                <Skeleton className="h-4 w-24 rounded" />
+              ) : (
+                <span
+                  className="line-clamp-2 min-w-0 flex-1 [overflow-wrap:anywhere]"
+                  title={label}
+                >
+                  {label}
+                </span>
+              )}
+            </>
           )
+          const rowClass = 'min-h-11 gap-3 px-3'
           if (isCurrent || item.to === undefined) {
             return (
               <DropdownMenuItem
                 key={item.id}
                 aria-current={isCurrent ? 'page' : undefined}
-                className="font-medium"
-                style={indent}
+                className={`${rowClass} bg-primary/10 font-medium text-foreground ring-1 ring-primary ring-inset`}
               >
                 {body}
-                <CheckIcon className="ms-auto" />
               </DropdownMenuItem>
             )
           }
           return (
-            <DropdownMenuItem key={item.id} asChild style={indent}>
+            <DropdownMenuItem key={item.id} asChild className={rowClass}>
               <Link to={item.to}>{body}</Link>
             </DropdownMenuItem>
           )

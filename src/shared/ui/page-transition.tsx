@@ -1,19 +1,10 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 
-/** Soft ease-out; leaving and entering use the same curve, length and distance. */
+import { LeavingGuard } from './leaving-guard'
+
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 const DURATION = 0.25
 const SHIFT = 8
-
-/** A page that is fading out is already gone for keyboard and assistive technology. */
-function LeavingGuard({ children }: { children: React.ReactNode }) {
-  const isPresent = useIsPresent()
-  return (
-    <div inert={!isPresent} aria-hidden={!isPresent || undefined} className="contents">
-      {children}
-    </div>
-  )
-}
 
 /**
  * Cross-page transition of the content area: the old page fades out (and moves a little), then the
@@ -31,7 +22,6 @@ export function PageTransition({
   transitionKey: string
   className?: string
   onEntered?: () => void
-  /** Runs when the old page is gone and the new one is about to mount. */
   onExited?: () => void
   children: React.ReactNode
 }) {

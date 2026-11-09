@@ -44,9 +44,7 @@ function Toaster({ toastOptions, ...props }: ToasterProps) {
         ...toastOptions,
         classNames: {
           ...toastOptions?.classNames,
-          // pr-12 keeps the text clear of the close button, which sits inside the toast.
-          toast: cn('cn-toast pr-12!', toastOptions?.classNames?.toast),
-          // Long user content must not grow a toast past a quarter of a 320 px screen.
+          toast: cn('cn-toast pr-10!', toastOptions?.classNames?.toast),
           title: cn(
             'line-clamp-2 max-h-12 [overflow-wrap:anywhere]',
             toastOptions?.classNames?.title,
@@ -60,10 +58,9 @@ function Toaster({ toastOptions, ...props }: ToasterProps) {
             toastOptions?.classNames?.actionButton,
           ),
           closeButton: cn(
-            // Inside the toast, top-right (sonner's default straddles the corner).
             'top-1.5! right-1.5! left-auto! transform-none!',
-            // WCAG 2.5.8: >= 24 px everywhere, 44 px touch target on mobile / coarse pointers.
-            'size-6! max-md:size-11! pointer-coarse:size-11!',
+            'size-6!',
+            'max-md:after:absolute max-md:after:-inset-2.5 max-md:after:content-[""] pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5 pointer-coarse:after:content-[""]',
             'bg-popover! border-border! text-popover-foreground!',
             'focus-visible:outline-2! focus-visible:outline-offset-2! focus-visible:outline-ring!',
             toastOptions?.classNames?.closeButton,

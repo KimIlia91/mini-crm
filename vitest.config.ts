@@ -29,7 +29,10 @@ export default mergeConfig(
             name: 'integration',
             environment: 'node',
             include: ['tests/integration/**/*.int.test.ts'],
-            globalSetup: ['./tests/setup/integration.global-setup.ts'],
+            globalSetup: [
+              './tests/setup/integration.global-setup.ts',
+              './tests/setup/clean-test-data.global-setup.ts',
+            ],
             testTimeout: 30_000,
             hookTimeout: 60_000,
             // Shared local database: run files sequentially to avoid cross-test interference.

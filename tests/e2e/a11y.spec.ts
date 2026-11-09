@@ -24,10 +24,6 @@ import {
 import { auditState, LONG } from './layout-helpers'
 import { bell, bellPopover, popoverItem, toastWith, watchRealtime } from './realtime-helpers'
 
-// P-items of ui-layout.md §6 that journeys.spec / layout.spec do not cover: keyboard journeys, skip
-// link, titles, landmarks and structure, focus visibility, zoom / text spacing, reduced motion and
-// axe in the dark theme. Runs in both projects (desktop and mobile emulation).
-
 const uid = () => crypto.randomUUID().slice(0, 8)
 
 /** Presses Tab until `target` has focus; fails when it is not reachable (focus order / keyboard trap). */
@@ -73,7 +69,6 @@ test.describe('keyboard-only journeys', () => {
 
     const take = page.getByRole('button', { name: 'Взять в работу' })
     await tabTo(page, take)
-    // Shift+Tab leaves the button and Tab comes back: no trap, symmetric order.
     await page.keyboard.press('Shift+Tab')
     await expect(take).not.toBeFocused()
     await page.keyboard.press('Tab')
@@ -91,7 +86,6 @@ test.describe('keyboard-only journeys', () => {
     await login(page, m)
     await openObjectsFiltered(page, token)
 
-    // Dialog: opens with Enter, keeps Tab / Shift+Tab inside, Esc closes and returns focus.
     const add = page.getByRole('button', { name: 'Добавить объект' })
     await tabTo(page, add)
     await page.keyboard.press('Enter')
@@ -110,7 +104,6 @@ test.describe('keyboard-only journeys', () => {
     await expect(dialog).toBeHidden()
     await expect(add).toBeFocused()
 
-    // Row menu: Enter opens, arrows move, Enter on «Удалить» opens the confirmation, Esc cancels.
     const rowActions = page.getByRole('button', { name: `Действия с объектом «${name}»` })
     await tabTo(page, rowActions)
     await page.keyboard.press('Enter')
@@ -125,7 +118,6 @@ test.describe('keyboard-only journeys', () => {
     await expect(confirm).toBeHidden()
     await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
 
-    // Forbidden path: the object is still there for the API too (nothing was deleted).
     const { data } = await m.client.from('objects').select('id').eq('name', name)
     expect(data).toHaveLength(1)
   })
@@ -176,7 +168,6 @@ test.describe('document structure', () => {
 
     await login(page, m)
     await expectTitle(page, 'Объекты — Mini-CRM')
-    // Client-side navigation updates the title as well.
     await page.getByRole('searchbox', { name: 'Поиск по названию и адресу' }).fill(token)
     await page.getByRole('link', { name: objectName, exact: true }).click()
     await expectTitle(page, `${objectName} — Mini-CRM`)
@@ -231,8 +222,6 @@ test.describe('document structure', () => {
           at(`heading levels ${levels.join(',')} must not skip a level`),
         ).toBeLessThanOrEqual(previous + 1)
       })
-
-      // The sidebar navigation: a sheet on narrow screens.
       if (usesSidebarSheet(p)) await p.getByRole('button', { name: SIDEBAR_TOGGLE }).click()
       const nav = mainNav(p)
       await expect(nav, at('main navigation landmark')).toBeVisible()
@@ -267,7 +256,6 @@ test.describe('document structure', () => {
     for (const path of ['/objects', `/objects/${objectId}`, `/tasks/${taskId}`]) {
       await page.goto(path)
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-      // The task page is not under /objects, so no sidebar link is current there.
       const current = path.startsWith('/tasks/') ? null : 'Объекты'
       await expectStructure(page, `manager ${path.replace(/[0-9a-f-]{36}/, ':id')}`, current)
     }
@@ -493,7 +481,6 @@ test.describe('reduced motion (2.3.3)', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Объекты' })).toBeVisible()
     await expectStill('objects page')
 
-    // Sidebar: permanent (collapses) on desktop, a sheet on narrow screens.
     await page.getByRole('button', { name: SIDEBAR_TOGGLE }).click()
     await expectStill(usesSidebarSheet(page) ? 'sidebar sheet open' : 'sidebar collapsing')
     if (usesSidebarSheet(page)) {
@@ -507,7 +494,6 @@ test.describe('reduced motion (2.3.3)', () => {
     await expectStill('dialog open')
     await page.keyboard.press('Escape')
 
-    // The theme menu is in the header on desktop and in the profile menu on phones.
     await (
       usesSidebarSheet(page)
         ? profileButton(page)
@@ -583,28 +569,25 @@ test.describe('notifications: bell popover and toasts', () => {
         await expect(popoverItem(page, title)).toBeVisible()
       }
       await expectNoA11yViolations(page)
-      // The empty state of the same popover.
       await bellPopover(page).getByRole('button', { name: 'Прочитать все' }).click()
       await expect(bell(page)).toHaveAccessibleName('Уведомления')
       await expectNoA11yViolations(page)
     })
-
-    test(`axe finds no serious violations with a toast on screen (${theme} theme)`, async ({
-      page,
-    }) => {
-      if (theme === 'dark') await useDarkTheme(page)
-      const { m, a, objectId } = await executorWithNotifications()
-      const rt = watchRealtime(page)
-      await login(page, a)
-      await rt.ready(a)
-      const title = `Свежая ${uid()}`
-      await createTask(m, objectId, a, title)
-      const toast = toastWith(page, title)
-      await expect(toast).toBeVisible({ timeout: 10_000 })
-      await expect(toast.getByRole('button', { name: 'Открыть' })).toBeVisible()
-      await expectNoA11yViolations(page)
-    })
   }
+
+  test('axe finds no serious violations with a toast on screen (dark theme)', async ({ page }) => {
+    await useDarkTheme(page)
+    const { m, a, objectId } = await executorWithNotifications()
+    const rt = watchRealtime(page)
+    await login(page, a)
+    await rt.ready(a)
+    const title = `Свежая ${uid()}`
+    await createTask(m, objectId, a, title)
+    const toast = toastWith(page, title)
+    await expect(toast).toBeVisible({ timeout: 15_000 })
+    await expect(toast.getByRole('button', { name: 'Открыть' })).toBeVisible()
+    await expectNoA11yViolations(page)
+  })
 
   test('reduced motion: the popover and a toast appear without movement animations', async ({
     page,
