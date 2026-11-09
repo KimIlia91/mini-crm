@@ -138,6 +138,17 @@ async function auditMenu(
 ): Promise<void> {
   await trigger.click()
   await expect(page.getByRole('menu')).toBeVisible()
+  await settleAnimations(page)
+  if (vp.width < 768) {
+    const box = await page.getByRole('menu').boundingBox()
+    expect(box?.x ?? -1, `${screen} / ${state}: menu left gap @${vp.width}`).toBeGreaterThanOrEqual(
+      15.5,
+    )
+    expect(
+      vp.width - ((box?.x ?? 0) + (box?.width ?? 0)),
+      `${screen} / ${state}: menu right gap @${vp.width}`,
+    ).toBeGreaterThanOrEqual(15.5)
+  }
   await auditState(page, { screen, state, viewport: vp })
   await page.keyboard.press('Escape')
   await expect(
@@ -220,7 +231,6 @@ test.describe('layout: app shell', () => {
       }
 
       await auditMenu(page, vp, screen, 'profile-menu-open', profileButton(page))
-      // On phones the theme is chosen in the profile menu (audited above); the header has no room.
       if (usesSidebarSheet(page)) {
         await expect(page.getByRole('button', { name: 'Сменить тему' })).toBeHidden()
       } else {
@@ -274,7 +284,6 @@ test.describe('layout: manager', () => {
 
       await auditMenu(page, vp, screen, 'row-menu-open', rowActions(page, name))
 
-      // 12 rows -> 2 pages of 10.
       await openObjectsFiltered(page, pagedToken)
       await expect(page.getByRole('status').filter({ hasText: 'Страница 1 из 2' })).toBeVisible()
       await auditState(page, { screen, state: 'pagination-page-1', viewport: vp })
@@ -356,6 +365,18 @@ test.describe('layout: manager', () => {
       const screen = 'object-manager'
       await page.goto(`/objects/${emptyId}`)
       await expect(page.getByText('В объекте пока нет задач')).toBeVisible()
+      const emptyHeading = await page.getByText('В объекте пока нет задач').boundingBox()
+      const wrapper = await page.locator('[data-slot="table-container"]').first().boundingBox()
+      expect(emptyHeading && wrapper, 'empty state and table wrapper are rendered').toBeTruthy()
+      if (emptyHeading && wrapper) {
+        expect(emptyHeading.x, `empty heading left @${vp.width}`).toBeGreaterThanOrEqual(
+          wrapper.x - 0.5,
+        )
+        expect(
+          emptyHeading.x + emptyHeading.width,
+          `empty heading right @${vp.width}`,
+        ).toBeLessThanOrEqual(wrapper.x + wrapper.width + 0.5)
+      }
       await auditState(page, { screen: 'object-manager-empty', state: 'page', viewport: vp })
 
       await page.goto(`/objects/${objectId}`)
@@ -464,6 +485,68 @@ test.describe('layout: manager', () => {
       await auditState(page, { screen: 'task-new-executor', state: 'page', viewport: vp })
     })
   })
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`task page: mobile path menu (${theme})`, async ({ page }) => {
+      const m = await createUser('manager', LONG.userLabel)
+      const a = await createUser('executor', LONG.userLabel)
+      const objectId = await createObject(m, longObjectName(), LONG.address)
+      const title = longTaskTitle()
+      const taskId = await createTask(m, objectId, a, title, LONG.description)
+      if (theme === 'dark') await useDarkTheme(page)
+      await login(page, m)
+
+      for (const vp of VIEWPORTS.filter((v) => v.width < 768)) {
+        await resize(page, vp)
+        await page.goto(`/tasks/${taskId}`)
+        await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+        const trigger = page.getByRole('button', { name: /показать путь/ })
+        await trigger.click()
+        const menu = page.getByRole('menu')
+        await expect(menu).toBeVisible()
+        await settleAnimations(page)
+
+        const box = await menu.boundingBox()
+        expect(box, 'path menu has a box').not.toBeNull()
+        if (box) {
+          expect(box.x, `menu left edge @ ${vp.width}`).toBeGreaterThanOrEqual(15)
+          expect(box.x + box.width, `menu right edge @ ${vp.width}`).toBeLessThanOrEqual(
+            vp.width - 15,
+          )
+          expect(box.width, `menu width @ ${vp.width}`).toBeGreaterThanOrEqual(vp.width - 40)
+        }
+        const items = menu.getByRole('menuitem')
+        await expect(items).toHaveCount(3)
+        for (const item of await items.all()) {
+          const h = (await item.boundingBox())?.height ?? 0
+          expect(h, `path row height @ ${vp.width}`).toBeGreaterThanOrEqual(44)
+          expect(await item.locator('svg').count(), 'row has a leading icon').toBeGreaterThan(0)
+        }
+        const current = items.last()
+        await expect(current).toHaveAttribute('aria-current', 'page')
+        expect(await current.evaluate((el) => el.closest('a') !== null || el.tagName === 'A')).toBe(
+          false,
+        )
+        await expect(menu.getByRole('menuitem').first()).toHaveAttribute('href', /\/objects/)
+        const lefts = await Promise.all((await items.all()).map((i) => i.boundingBox()))
+        expect(new Set(lefts.map((b) => Math.round(b?.x ?? 0))).size).toBe(1)
+
+        await auditState(page, {
+          screen: `task-path-menu-${theme}`,
+          state: 'open',
+          viewport: vp,
+        })
+        await page.keyboard.press('Escape')
+        await expect(menu).toBeHidden()
+        await expect(trigger).toBeFocused()
+      }
+
+      await page.keyboard.press('Enter')
+      await expect(page.getByRole('menu')).toBeVisible()
+      await page.keyboard.press('Enter')
+      await expect(page).toHaveURL(/\/objects(\?.*)?$/)
+    })
+  }
 
   test('task page: in review with long rework history; rework note; rework dialog', async ({
     page,
@@ -709,7 +792,7 @@ test.describe('layout: notifications (bell popover and toasts)', () => {
     await login(page, a)
     await rt.ready(a)
 
-    for (const vp of [VIEWPORTS[0], VIEWPORTS[3]]) {
+    for (const vp of [VIEWPORTS[0], VIEWPORTS[1], VIEWPORTS[3]]) {
       await resize(page, vp)
       await expect(page.getByRole('heading', { level: 1, name: 'Мои задачи' })).toBeVisible()
 
@@ -718,11 +801,12 @@ test.describe('layout: notifications (bell popover and toasts)', () => {
       await expect(bellPopover(page).getByRole('listitem').first()).toBeVisible()
       const box = await bellPopover(page).boundingBox()
       expect(box, 'popover is rendered').not.toBeNull()
-      expect(box?.x ?? -1, `popover left edge @${vp.width}`).toBeGreaterThanOrEqual(0)
+      const gutter = vp.width < 768 ? 15.5 : 0
+      expect(box?.x ?? -1, `popover left gap @${vp.width}`).toBeGreaterThanOrEqual(gutter)
       expect(
-        (box?.x ?? 0) + (box?.width ?? 0),
-        `popover right edge @${vp.width}`,
-      ).toBeLessThanOrEqual(vp.width)
+        vp.width - ((box?.x ?? 0) + (box?.width ?? 0)),
+        `popover right gap @${vp.width}`,
+      ).toBeGreaterThanOrEqual(gutter)
       expect(
         (box?.y ?? 0) + (box?.height ?? 0),
         `popover bottom edge @${vp.width}`,
@@ -731,7 +815,6 @@ test.describe('layout: notifications (bell popover and toasts)', () => {
       await page.keyboard.press('Escape')
       await expect(bellPopover(page)).toBeHidden()
 
-      // A fresh assignment announces itself with a toast that must not cover the header.
       const title = longTaskTitle()
       await createTask(m, objectId, a, title)
       const toast = toastWith(page, title.slice(0, 20))
@@ -748,6 +831,22 @@ test.describe('layout: notifications (bell popover and toasts)', () => {
         expect(toastBox.x + toastBox.width, `toast right edge @${vp.width}`).toBeLessThanOrEqual(
           vp.width,
         )
+      }
+      const closeBox = await toast
+        .first()
+        .getByRole('button', { name: 'Закрыть уведомление' })
+        .boundingBox()
+      const actionBox = await toast.first().getByRole('button', { name: 'Открыть' }).boundingBox()
+      expect(closeBox && actionBox, 'close and action buttons are rendered').toBeTruthy()
+      if (closeBox && actionBox) {
+        const hit = 10
+        const apart =
+          closeBox.x + closeBox.width + hit <= actionBox.x ||
+          actionBox.x + actionBox.width <= closeBox.x - hit ||
+          closeBox.y + closeBox.height + hit <= actionBox.y ||
+          actionBox.y + actionBox.height <= closeBox.y - hit
+        expect(apart, `close button overlaps the action button @${vp.width}`).toBe(true)
+        expect(closeBox.width, `close circle is small @${vp.width}`).toBeLessThanOrEqual(26)
       }
       await auditState(page, {
         screen: 'toast',

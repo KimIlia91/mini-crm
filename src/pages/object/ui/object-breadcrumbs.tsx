@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Building2Icon, MapPinIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Params } from 'react-router'
 
@@ -12,14 +13,19 @@ export function ObjectBreadcrumbs({ params }: { params: Readonly<Params> }) {
   const objectId = params.objectId ?? ''
   const object = useQuery({ ...objectQueries.detail(objectId), enabled: objectId !== '' })
   const cachedName = useCachedObjectName(objectId)
-  const current: BreadcrumbTrailItem = { id: `object:${objectId}` }
+  const current: BreadcrumbTrailItem = { id: `object:${objectId}`, icon: MapPinIcon }
   const name = object.data?.name ?? cachedName
   if (name === undefined && object.isPending && objectId !== '') current.loading = true
   else current.label = name ?? t('crumbs.object')
   return (
     <BreadcrumbTrail
       items={[
-        { id: 'objects', label: t('crumbs.objects'), to: listHref('/objects', 'objects') },
+        {
+          id: 'objects',
+          label: t('crumbs.objects'),
+          to: listHref('/objects', 'objects'),
+          icon: Building2Icon,
+        },
         current,
       ]}
     />

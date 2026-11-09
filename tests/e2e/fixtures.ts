@@ -7,17 +7,36 @@ import { getLocalSupabaseAdminEnv } from '../../scripts/supabase-env.mjs'
 import type { Database } from '../../src/shared/api/database.types'
 
 /** Lets finite CSS/Web animations (sheet, dialog, menu transitions) end, so colours are final. */
+/**
+ * Waits until nothing on the page is still moving: every finite CSS/WAAPI animation has finished
+ * (re-checked after two frames, because a dialog or page that has just mounted registers its
+ * animation a frame later) and no subtree that is fading out (`inert`, see `LeavingGuard`) is left —
+ * motion's exit animations are not always visible to `getAnimations()`.
+ */
 export async function settleAnimations(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const finite = document
-      .getAnimations()
-      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
-    await Promise.allSettled(finite.map((animation) => animation.finished))
+    const frames = () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve()
+          })
+        })
+      })
+    const deadline = Date.now() + 5_000
+    for (;;) {
+      await frames()
+      const finite = document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+      await Promise.allSettled(finite.map((animation) => animation.finished))
+      if (finite.length === 0 && document.querySelector('[inert]') === null) return
+      if (Date.now() > deadline) return
+    }
   })
 }
 
 export async function expectNoA11yViolations(page: Page): Promise<void> {
-  // Contrast is computed from the rendered colours: a half-faded overlay would give false results.
   await settleAnimations(page)
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -58,7 +77,6 @@ export interface E2EUser {
   password: string
   fullName: string
   role: AppRole
-  /** Client signed in as this user (active users only) — test data setup through the RLS-bound API. */
   client: SupabaseClient<Database>
 }
 
@@ -136,9 +154,6 @@ export async function login(
   await page.getByLabel('Email').fill(user.email)
   await page.getByLabel('Пароль').fill(user.password)
   await page.getByRole('button', { name: 'Войти' }).click()
-  // Password sign-in is bcrypt-bound: with every worker creating and signing in users at once the
-  // local auth server answered /token in up to ~2.8 s (browser-observed ~4.9 s with the gateway),
-  // measured 2026-11-07. A real single user waits ~150 ms; this only absorbs parallel-run load.
   if (expectSuccess) await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
 }
 

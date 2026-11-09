@@ -75,3 +75,29 @@ export async function useDarkTheme(page: Page): Promise<void> {
     window.localStorage.setItem('mini-crm-theme', 'dark')
   })
 }
+
+/**
+ * Records every moment an element receives `aria-hidden="true"` while the focused element is inside
+ * it (Chrome warns «Blocked aria-hidden … descendant retained focus»; headless Playwright does not
+ * surface that message, so the invariant is observed directly). Call before the first navigation.
+ */
+export async function watchHiddenFocus(page: Page): Promise<() => Promise<string[]>> {
+  await page.addInitScript(() => {
+    const found: string[] = []
+    ;(window as unknown as { __hiddenFocus: string[] }).__hiddenFocus = found
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const el = record.target
+        if (!(el instanceof HTMLElement) || el.getAttribute('aria-hidden') !== 'true') continue
+        const active = document.activeElement
+        if (active && active !== document.body && el.contains(active)) {
+          found.push(
+            `${el.tagName}[${el.dataset.slot ?? el.className.slice(0, 40)}] holds ${active.tagName}`,
+          )
+        }
+      }
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ['aria-hidden'] })
+  })
+  return () =>
+    page.evaluate(() => (window as unknown as { __hiddenFocus?: string[] }).__hiddenFocus ?? [])
+}

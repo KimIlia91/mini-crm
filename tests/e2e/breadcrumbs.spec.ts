@@ -1,11 +1,8 @@
 /// <reference lib="dom" />
 import type { Page } from '@playwright/test'
 
-import { openObjectsFiltered } from './app-helpers'
+import { openObjectsFiltered, watchHiddenFocus } from './app-helpers'
 import { createObject, createTask, createUser, expect, login, test, type E2EUser } from './fixtures'
-
-// Breadcrumb transitions are measured frame by frame (requestAnimationFrame): crumbs that exist
-// before and after a navigation must stay put and fully opaque; nothing may be shown twice.
 
 test.skip(({ isMobile }) => isMobile, 'breadcrumb animation is measured on desktop 1280x800')
 test.use({ viewport: { width: 1280, height: 800 } })
@@ -66,7 +63,6 @@ async function installRecorder(page: Page): Promise<void> {
       }
       requestAnimationFrame(tick)
     }
-    // Recording starts before the action; the window is counted from the moment the action returns.
     w.__markCrumbRec = (ms) => {
       if (w.__crumbRec) w.__crumbRec.stopAt = performance.now() + ms
     }
@@ -107,11 +103,8 @@ async function record(page: Page, action: () => Promise<void>): Promise<Frame[]>
 interface Expectation {
   label: string
   frames: Frame[]
-  /** Crumbs of the stable state before the action. */
   before: Crumb[]
-  /** Expected final chain (real names). */
   chain: string[]
-  /** (b) needs a stable state before the action; after a reload nothing exists yet (crumbs appear). */
   checkPersistent?: boolean
 }
 
@@ -127,7 +120,6 @@ function checkTransition({
   expect(frames.length, `${label}: frames were recorded`).toBeGreaterThan(10)
   const last = frames.at(-1)?.crumbs ?? []
 
-  // (g) final chain with the real names and aria-current on the last crumb only.
   expect(texts(last), `${label}: final breadcrumb chain`).toEqual(chain)
   expect(
     last.map((c) => c.current),
@@ -139,17 +131,14 @@ function checkTransition({
   const problems: string[] = []
   for (const frame of frames) {
     const names = texts(frame.crumbs).filter(Boolean)
-    // (a) nothing shown twice.
     const duplicated = names.filter((name, i) => names.indexOf(name) !== i)
     if (duplicated.length > 0)
       problems.push(`t=${frame.t}ms duplicate crumb: ${duplicated.join(', ')}`)
-    // (c) no more items than the new path plus the segments that are leaving.
     if (frame.crumbs.length > chain.length + leaving) {
       problems.push(
         `t=${frame.t}ms ${frame.crumbs.length} items > ${chain.length} (path) + ${leaving} (leaving): ${names.join(' | ')}`,
       )
     }
-    // (b) crumbs present before and after stay put and opaque in every frame.
     for (const text of persistent) {
       const crumb = frame.crumbs.find((c) => c.text === text)
       const ref = before.find((c) => c.text === text)
@@ -211,11 +200,11 @@ test.describe('breadcrumbs while navigating (reduced motion: no-preference)', ()
       try {
         checkTransition({ ...e, label })
       } catch (error) {
-        // Keep measuring the other transitions; the failure is still reported at the end.
         failures.push(error instanceof Error ? error.message : label)
       }
     }
     const failures: string[] = []
+    const hiddenFocus = await watchHiddenFocus(page)
     try {
       await installRecorder(page)
       await login(page, f.m)
@@ -223,14 +212,12 @@ test.describe('breadcrumbs while navigating (reduced motion: no-preference)', ()
       await expect(page.getByRole('link', { name: f.objectName, exact: true })).toBeVisible()
       await expect(page.getByRole('navigation', { name: 'Навигация по страницам' })).toBeVisible()
 
-      // 1. objects -> object
       let before = await snapshot(page)
       let frames = await record(page, () =>
         page.getByRole('link', { name: f.objectName, exact: true }).click(),
       )
       soft('1 objects -> object', { label: '', frames, before, chain: chainObject })
 
-      // 2. object -> task
       await expect(page.getByRole('link', { name: f.taskTitle, exact: true })).toBeVisible()
       before = await snapshot(page)
       frames = await record(page, () =>
@@ -238,7 +225,6 @@ test.describe('breadcrumbs while navigating (reduced motion: no-preference)', ()
       )
       soft('2 object -> task', { label: '', frames, before, chain: chainTask })
 
-      // 3. task -> back (browser)
       await expect(page.getByRole('heading', { level: 1, name: f.taskTitle })).toBeVisible()
       before = await snapshot(page)
       frames = await record(page, async () => {
@@ -246,7 +232,6 @@ test.describe('breadcrumbs while navigating (reduced motion: no-preference)', ()
       })
       soft('3 task -> back', { label: '', frames, before, chain: chainObject })
 
-      // 4. task -> click on the object crumb
       await page.goForward()
       await expect(page.getByRole('heading', { level: 1, name: f.taskTitle })).toBeVisible()
       await expect(page.getByRole('navigation', { name: 'Навигация по страницам' })).toContainText(
@@ -261,7 +246,6 @@ test.describe('breadcrumbs while navigating (reduced motion: no-preference)', ()
       )
       soft('4 task -> object crumb', { label: '', frames, before, chain: chainObject })
 
-      // 5. reload of the task page: the recorder auto-starts with the document.
       await page.goto(`/tasks/${f.taskId}`)
       await expect(page.getByRole('heading', { level: 1, name: f.taskTitle })).toBeVisible()
       await page.evaluate(() => {
@@ -279,7 +263,6 @@ test.describe('breadcrumbs while navigating (reduced motion: no-preference)', ()
       await page.evaluate(() => {
         window.sessionStorage.removeItem('e2e-crumbs')
       })
-      // The document starts empty: measure from the first frame that shows any crumb.
       const shown = frames.slice(frames.findIndex((frame) => frame.crumbs.length > 0))
       soft('5 reload task page', {
         label: '',
@@ -292,6 +275,7 @@ test.describe('breadcrumbs while navigating (reduced motion: no-preference)', ()
       await f.cleanup()
     }
     expect(failures, 'breadcrumb transitions with violations').toEqual([])
+    expect(await hiddenFocus(), 'aria-hidden set on a subtree holding focus').toEqual([])
   })
 })
 
@@ -363,7 +347,6 @@ test.describe('breadcrumbs after F5 on a task page', () => {
       await page.reload()
       const trail = page.getByRole('navigation', { name: 'Навигация по страницам' })
       await expect(trail).toContainText(f.taskTitle)
-      // Wait until the entrance animation of the reloaded page is over (all crumbs opaque and still).
       await expect
         .poll(
           async () => {
@@ -389,7 +372,6 @@ test.describe('breadcrumbs after F5 on a task page', () => {
       expect(frames.length, 'frames were recorded').toBeGreaterThan(10)
       const problems: string[] = []
       for (const frame of frames) {
-        // (d) the object crumb never loses its text or changes width (no fall back to a skeleton).
         const object = frame.crumbs.find((c) => c.text === f.objectName)
         if (!object) {
           problems.push(
@@ -400,7 +382,6 @@ test.describe('breadcrumbs after F5 on a task page', () => {
             `t=${frame.t}ms object crumb width ${objectBefore.w.toFixed(1)}->${object.w.toFixed(1)}`,
           )
         }
-        // (e) no two crumbs (including the leaving one) overlap.
         const items = frame.crumbs.filter((c) => c.w > 0)
         for (let i = 0; i < items.length; i++) {
           for (let j = i + 1; j < items.length; j++) {

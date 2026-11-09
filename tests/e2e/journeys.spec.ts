@@ -9,6 +9,7 @@ import {
 } from './fixtures'
 import {
   goToSection,
+  watchHiddenFocus,
   headerStatus,
   newUserPage,
   openObjectsFiltered,
@@ -24,7 +25,6 @@ const unique = (prefix: string) => `${prefix} ${crypto.randomUUID().slice(0, 8)}
 
 test.describe('manager creates work', () => {
   test('M creates an object and a task for A; the task is «Новая»', async ({ page }) => {
-    // Create, check, sign in as A: ~34 s under a full parallel run (measured 2026-11-07).
     test.slow()
     const [m, a] = await Promise.all([createUser('manager', 'm'), createUser('executor', 'a')])
     const objectName = unique('Объект')
@@ -42,7 +42,6 @@ test.describe('manager creates work', () => {
     await objectDialog.getByRole('button', { name: 'Создать' }).click()
     await expect(objectDialog).toBeHidden()
 
-    // The list is shared and paged (10 per page): find the new object by search before opening it.
     await page.getByRole('searchbox', { name: 'Поиск по названию и адресу' }).fill(objectName)
     await page.getByRole('link', { name: objectName }).click()
     await expect(page.getByRole('heading', { level: 1, name: objectName })).toBeVisible()
@@ -77,7 +76,6 @@ test.describe('manager manages objects and tasks', () => {
     browser,
     page,
   }) => {
-    // Three users, three sign-ins and a dozen screens: ~21 s alone, longer under a parallel run.
     test.slow()
     const [m, a, b] = await Promise.all([
       createUser('manager', 'm'),
@@ -92,7 +90,6 @@ test.describe('manager manages objects and tasks', () => {
     const objectId = await createObject(m, objectName, 'Адрес до')
     const taskId = await createTask(m, objectId, a, taskTitle, 'Описание до')
 
-    // 1. Edit the object from the row menu of the list.
     await login(page, m)
     await openObjectsFiltered(page, token)
     await page.getByRole('button', { name: `Действия с объектом «${objectName}»` }).click()
@@ -111,7 +108,6 @@ test.describe('manager manages objects and tasks', () => {
     await expect(page.getByText('Адрес после')).toBeVisible()
     await expectNoA11yViolations(page)
 
-    // 2. Edit the task (title and description), then reassign it A -> B.
     await page.getByRole('link', { name: taskTitle, exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: taskTitle })).toBeVisible()
     await page.getByRole('button', { name: 'Действия с задачей' }).click()
@@ -138,7 +134,6 @@ test.describe('manager manages objects and tasks', () => {
     await expect(page.getByText(a.fullName, { exact: true })).toHaveCount(0)
     await expectNoA11yViolations(page)
 
-    // 3. A lost the task, B sees it in «Мои задачи».
     const pageA = await newUserPage(browser)
     await login(pageA, a)
     await expect(pageA.getByText('Вам пока не назначено задач')).toBeVisible()
@@ -161,8 +156,6 @@ test.describe('manager manages objects and tasks', () => {
     await expect(pageB.getByRole('heading', { level: 1, name: editedTitle })).toBeVisible()
     await expect(pageB.getByRole('button', { name: 'Взять в работу' })).toBeVisible()
 
-    // 4. The object with an active task cannot be deleted; the error is shown inside the dialog.
-    // The page is on the task: the object is linked both from the breadcrumbs and from the details.
     await page.getByRole('main').getByRole('link', { name: renamed, exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: renamed })).toBeVisible()
     await page.getByRole('button', { name: 'Действия с объектом' }).click()
@@ -176,7 +169,6 @@ test.describe('manager manages objects and tasks', () => {
     await objectConfirm.getByRole('button', { name: 'Отмена' }).click()
     await expect(objectConfirm).toBeHidden()
 
-    // 5. Delete the task (soft): it leaves the object page and both executors' views.
     await page.getByRole('link', { name: editedTitle, exact: true }).click()
     await page.getByRole('button', { name: 'Действия с задачей' }).click()
     await page.getByRole('menuitem', { name: 'Удалить' }).click()
@@ -199,7 +191,6 @@ test.describe('manager manages objects and tasks', () => {
     await pageA.goto('/my-tasks')
     await expect(pageA.getByText('Вам пока не назначено задач')).toBeVisible()
 
-    // 6. Now the object is empty and can be deleted.
     await page.goto(`/objects/${objectId}`)
     await page.getByRole('button', { name: 'Действия с объектом' }).click()
     await page.getByRole('menuitem', { name: 'Удалить' }).click()
@@ -245,12 +236,12 @@ test.describe('executor works on a task', () => {
     const objectId = await createObject(m, objectName)
     const taskId = await createTask(m, objectId, a, title)
 
+    const hiddenFocus = await watchHiddenFocus(page)
     await login(page, a)
     await expect(page).toHaveURL(/\/my-tasks$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Мои задачи' })).toBeVisible()
     await expectNoA11yViolations(page)
 
-    // The executor sees the object in the list without any manager controls.
     await goToSection(page, 'Объекты')
     await expect(page.getByRole('link', { name: objectName })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Добавить объект' })).toHaveCount(0)
@@ -283,18 +274,17 @@ test.describe('executor works on a task', () => {
     await expect(page.getByRole('button', { name: 'Добавить задачу' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Действия с объектом' })).toHaveCount(0)
     await expectNoA11yViolations(page)
+    expect(await hiddenFocus(), 'aria-hidden set on a subtree holding focus').toEqual([])
   })
 })
 
 test.describe('review cycle', () => {
   test('M returns for rework with a comment, A resubmits, M accepts', async ({ browser }) => {
-    // Two users take turns over several sign-ins; under a parallel run it outgrows 30 s.
     test.slow()
     const [m, a] = await Promise.all([createUser('manager', 'm'), createUser('executor', 'a')])
     const title = unique('Задача')
     const objectId = await createObject(m, unique('Объект'))
     const taskId = await createTask(m, objectId, a, title)
-    // Move the task to review through the API; the UI journey below starts from there.
     const steps: TaskStatus[] = ['in_progress', 'in_review']
     for (const to of steps) {
       const { error } = await a.client.rpc('change_task_status', {
@@ -337,8 +327,6 @@ test.describe('review cycle', () => {
     await expect(headerStatus(executorPage, 'В работе')).toBeVisible()
     await expect(executorPage.getByRole('note', { name: 'Замечание постановщика' })).toHaveCount(0)
     await executorPage.getByRole('button', { name: 'Отправить на проверку' }).click()
-    // The history already holds an earlier «На проверке» entry, so the status text alone proves nothing:
-    // wait until the transition is applied (the button is gone) before the manager reloads.
     await expect(executorPage.getByRole('button', { name: 'Отправить на проверку' })).toHaveCount(0)
     await expect(headerStatus(executorPage, 'На проверке')).toBeVisible()
 
@@ -347,7 +335,6 @@ test.describe('review cycle', () => {
     await expect(headerStatus(managerPage, 'Принята')).toBeVisible()
     await expect(managerPage.getByRole('button', { name: 'Принять', exact: true })).toHaveCount(0)
     await expect(managerPage.getByRole('button', { name: 'Вернуть на доработку' })).toHaveCount(0)
-    // An accepted task is not editable: the menu keeps only «Удалить».
     await managerPage.getByRole('button', { name: 'Действия с задачей' }).click()
     await expect(managerPage.getByRole('menuitem', { name: 'Удалить' })).toBeVisible()
     await expect(managerPage.getByRole('menuitem', { name: 'Редактировать' })).toHaveCount(0)

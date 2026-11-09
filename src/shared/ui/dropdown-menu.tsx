@@ -32,7 +32,7 @@ function DropdownMenuContent({
   className,
   align = 'start',
   sideOffset = 4,
-  collisionPadding = 8,
+  collisionPadding = 16,
   onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
@@ -43,8 +43,6 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         align={align}
-        // The trigger toggles the menu itself. Without this, a menu that is still fading out would
-        // treat a click on its trigger as an outside click and close the menu that click just reopened.
         onInteractOutside={(event) => {
           onInteractOutside?.(event)
           if (
@@ -55,7 +53,7 @@ function DropdownMenuContent({
           }
         }}
         className={cn(
-          'z-50 max-h-(--radix-dropdown-menu-content-available-height) w-max max-w-[calc(100vw-1rem)] min-w-40 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:overflow-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+          'z-50 max-h-(--radix-dropdown-menu-content-available-height) w-max max-w-[calc(100vw-2rem)] min-w-40 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:overflow-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
           className,
         )}
         {...props}

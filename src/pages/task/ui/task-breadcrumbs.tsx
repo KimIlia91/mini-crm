@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Building2Icon, ClipboardListIcon, MapPinIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Params } from 'react-router'
 
@@ -18,14 +19,19 @@ export function TaskBreadcrumbs({ params }: { params: Readonly<Params> }) {
   const cachedTitle = useCachedTaskTitle(taskId)
   const taskCrumbId = `task:${taskId}`
   const items: BreadcrumbTrailItem[] = [
-    { id: 'objects', label: t('crumbs.objects'), to: listHref('/objects', 'objects') },
+    {
+      id: 'objects',
+      label: t('crumbs.objects'),
+      to: listHref('/objects', 'objects'),
+      icon: Building2Icon,
+    },
   ]
   if (task.isPending && taskId !== '') {
     items.push(
-      { id: 'task-object', loading: true, keepPrevious: true },
+      { id: 'task-object', loading: true, keepPrevious: true, icon: MapPinIcon },
       cachedTitle === undefined
-        ? { id: taskCrumbId, loading: true }
-        : { id: taskCrumbId, label: cachedTitle },
+        ? { id: taskCrumbId, loading: true, icon: ClipboardListIcon }
+        : { id: taskCrumbId, label: cachedTitle, icon: ClipboardListIcon },
     )
   } else if (task.data) {
     items.push(
@@ -33,11 +39,12 @@ export function TaskBreadcrumbs({ params }: { params: Readonly<Params> }) {
         id: `object:${task.data.object.id}`,
         label: task.data.object.name,
         to: listHref(`/objects/${task.data.object.id}`, `object:${task.data.object.id}`),
+        icon: MapPinIcon,
       },
-      { id: taskCrumbId, label: task.data.title },
+      { id: taskCrumbId, label: task.data.title, icon: ClipboardListIcon },
     )
   } else {
-    items.push({ id: taskCrumbId, label: t('crumbs.task') })
+    items.push({ id: taskCrumbId, label: t('crumbs.task'), icon: ClipboardListIcon })
   }
   return <BreadcrumbTrail items={items} />
 }

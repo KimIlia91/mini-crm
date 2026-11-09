@@ -20,15 +20,8 @@ const DEFAULT_SKELETON_ROWS = 5
 
 interface DataTableProps<TData> {
   table: TanstackTable<TData>
-  /** Accessible name of the table. */
   label: string
-  /**
-   * The rows for the current state are not there yet. The previous rows stay until a short delay has
-   * passed (a fast answer never flashes a skeleton), then skeleton rows of the final row height
-   * replace them with a fade.
-   */
   isLoading?: boolean
-  /** Rendered in a single cell when no rows match (e.g. an `Empty` block). */
   empty: React.ReactNode
 }
 
@@ -60,11 +53,8 @@ export function DataTable<TData>({
   else if (isLoading && rows.length === 0 && !loadedOnce) phase = 'hold'
   const { shown, opacity, onFadeEnd } = useBodyPhase(phase)
 
-  // The skeleton has as many rows as the page it replaces, so the table keeps its height.
   const [rowCount, setRowCount] = useState(0)
   if (shown === 'data' && rows.length > 0 && rowCount !== rows.length) setRowCount(rows.length)
-  // Skeleton rows are as tall as the real ones were (the average of the rows on screen), so the
-  // table and everything under it keep their place. Written straight to the DOM, no re-render.
   const wrapper = useRef<HTMLDivElement>(null)
   const body = useRef<HTMLTableSectionElement>(null)
   useLayoutEffect(() => {
@@ -86,11 +76,9 @@ export function DataTable<TData>({
       <Table
         aria-label={label}
         aria-busy={isLoading || undefined}
-        containerClassName="min-h-0 scroll-pt-10 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50 fit-screen:flex-auto fit-screen:overflow-auto"
+        containerClassName="@container min-h-0 scroll-pt-10 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50 fit-screen:flex-auto fit-screen:overflow-auto"
         containerProps={{
           tabIndex: 0,
-          // A focused control that is only partly visible (a header button in a column beyond the
-          // edge) is scrolled fully into view.
           onFocus: (event) => {
             if (event.target instanceof HTMLElement) {
               event.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -170,7 +158,7 @@ export function DataTable<TData>({
           ) : (
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={columns.length} className="p-0">
-                {empty}
+                <div className="sticky left-0 w-[100cqw] max-w-full">{empty}</div>
               </TableCell>
             </TableRow>
           )}
