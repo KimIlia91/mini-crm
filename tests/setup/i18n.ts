@@ -4,7 +4,9 @@ import { entityNotificationRu } from '../../src/entities/notification/i18n/ru'
 import { entityTaskRu } from '../../src/entities/task/i18n/ru'
 import { manageObjectRu } from '../../src/features/manage-object/i18n/ru'
 import { manageTaskRu } from '../../src/features/manage-task/i18n/ru'
+import { transitionCommentRu } from '../../src/features/transition-comment/i18n/ru'
 import { aboutRu } from '../../src/pages/about/i18n/ru'
+import { boardRu } from '../../src/pages/board/i18n/ru'
 import { changePasswordRu } from '../../src/pages/change-password/i18n/ru'
 import { loginRu } from '../../src/pages/login/i18n/ru'
 import { myTasksRu } from '../../src/pages/my-tasks/i18n/ru'
@@ -23,6 +25,8 @@ const bundles = {
   'entity-task': entityTaskRu,
   'manage-object': manageObjectRu,
   'manage-task': manageTaskRu,
+  'transition-comment': transitionCommentRu,
+  board: boardRu,
   login: loginRu,
   'change-password': changePasswordRu,
   'not-found': notFoundRu,

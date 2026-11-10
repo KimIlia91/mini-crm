@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { Viewer } from '@/entities/profile'
@@ -9,9 +10,8 @@ import {
   useTaskErrorMessage,
   type TaskStatus,
 } from '@/entities/task'
+import { TransitionCommentDialog } from '@/features/transition-comment'
 import { Alert, AlertDescription, Button, Skeleton } from '@/shared/ui'
-
-import { CommentDialog } from './comment-dialog'
 
 interface TaskActionsProps {
   task: { id: string; status: TaskStatus; assignee_id: string }
@@ -28,9 +28,10 @@ export function TaskActions({ task, viewer }: TaskActionsProps) {
   const taskErrorMessage = useTaskErrorMessage()
   const rules = useQuery(transitionQueries.all())
   const change = useChangeTaskStatus()
+  const [commentFor, setCommentFor] = useState<TaskStatus | null>(null)
+  const opener = useRef<HTMLElement | null>(null)
 
   if (rules.isPending) return <Skeleton className="h-9 w-40" />
-  // A failed background refetch keeps the cached rules, so the open comment dialog stays mounted.
   if (rules.isError && rules.data === undefined) {
     return (
       <Alert variant="destructive" role="alert" className="w-72 max-w-full">
@@ -51,7 +52,6 @@ export function TaskActions({ task, viewer }: TaskActionsProps) {
   }
 
   const available = getAvailableTransitions(rules.data, task, viewer)
-  // After a failed transition the refetch may leave no actions; the error must stay visible.
   if (available.length === 0 && !change.isError) return null
 
   return (
@@ -59,20 +59,18 @@ export function TaskActions({ task, viewer }: TaskActionsProps) {
       {available.map((rule) => {
         const label = tTask(`transition.${rule.to_status}`)
         return rule.comment_required ? (
-          <CommentDialog
+          <Button
             key={rule.to_status}
-            label={label}
+            variant="outline"
             disabled={change.isPending}
-            isPending={change.isPending}
-            error={change.error}
-            onOpen={change.reset}
-            onSubmit={(comment, onDone) => {
-              change.mutate(
-                { taskId: task.id, toStatus: rule.to_status, comment },
-                { onSuccess: onDone },
-              )
+            onClick={(event) => {
+              opener.current = event.currentTarget
+              change.reset()
+              setCommentFor(rule.to_status)
             }}
-          />
+          >
+            {label}
+          </Button>
         ) : (
           <Button
             key={rule.to_status}
@@ -85,6 +83,31 @@ export function TaskActions({ task, viewer }: TaskActionsProps) {
           </Button>
         )
       })}
+      {commentFor !== null && available.some((rule) => rule.to_status === commentFor) ? (
+        <TransitionCommentDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setCommentFor(null)
+          }}
+          label={tTask(`transition.${commentFor}`)}
+          isPending={change.isPending}
+          error={change.error}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            if (opener.current?.isConnected === true) opener.current.focus()
+          }}
+          onSubmit={(comment) => {
+            change.mutate(
+              { taskId: task.id, toStatus: commentFor, comment },
+              {
+                onSuccess: () => {
+                  setCommentFor(null)
+                },
+              },
+            )
+          }}
+        />
+      ) : null}
       {change.isError ? (
         <Alert variant="destructive" role="alert" className="w-72 max-w-full basis-full">
           <AlertDescription>{taskErrorMessage(change.error)}</AlertDescription>

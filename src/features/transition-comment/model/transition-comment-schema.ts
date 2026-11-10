@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** Zod messages are `task` translation keys; the dialog translates them. */
+/** Zod messages are `transition-comment` translation keys; the dialog translates them. */
 export const COMMENT_FORM_ERRORS = {
   required: 'validation.commentRequired',
   tooLong: 'validation.commentTooLong',

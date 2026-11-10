@@ -5,10 +5,12 @@ export const layoutRu = {
     group: 'Разделы',
     objects: 'Объекты',
     myTasks: 'Мои задачи',
+    board: 'Доска',
   },
   crumbs: {
     objects: 'Объекты',
     myTasks: 'Мои задачи',
+    board: 'Доска',
   },
   role: {
     manager: 'Постановщик',

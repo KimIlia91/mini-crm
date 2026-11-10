@@ -10,6 +10,7 @@ export type { Database } from './database.types'
 export {
   ilikeContains,
   isRangeNotSatisfiable,
+  MAX_PAGE_SIZE,
   normalizeSearch,
   pageRange,
   quoteFilterValue,

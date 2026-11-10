@@ -1,11 +1,11 @@
-import { Building2Icon, ListChecksIcon, type LucideIcon } from 'lucide-react'
+import { Building2Icon, KanbanIcon, ListChecksIcon, type LucideIcon } from 'lucide-react'
 
 import type { AppRole } from '@/entities/profile'
 
 export interface NavItem {
   to: string
   listKey: string
-  labelKey: 'nav.objects' | 'nav.myTasks'
+  labelKey: 'nav.objects' | 'nav.myTasks' | 'nav.board'
   icon: LucideIcon
   roles: readonly AppRole[]
 }
@@ -24,5 +24,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     labelKey: 'nav.myTasks',
     icon: ListChecksIcon,
     roles: ['executor'],
+  },
+  {
+    to: '/board',
+    listKey: 'board',
+    labelKey: 'nav.board',
+    icon: KanbanIcon,
+    roles: ['manager', 'executor'],
   },
 ]

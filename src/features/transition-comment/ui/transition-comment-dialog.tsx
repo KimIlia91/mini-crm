@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
@@ -15,20 +14,24 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   Label,
   Textarea,
 } from '@/shared/ui'
 
-import { COMMENT_FORM_ERROR_KEYS, commentSchema, type CommentValues } from '../model/comment-schema'
+import {
+  COMMENT_FORM_ERROR_KEYS,
+  commentSchema,
+  type CommentValues,
+} from '../model/transition-comment-schema'
 
-interface CommentDialogProps {
+interface TransitionCommentDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   label: string
-  disabled: boolean
   isPending: boolean
   error: unknown
-  onOpen: () => void
-  onSubmit: (comment: string, onDone: () => void) => void
+  onSubmit: (comment: string) => void
+  onCloseAutoFocus?: (event: Event) => void
 }
 
 function CommentForm({
@@ -36,10 +39,8 @@ function CommentForm({
   isPending,
   error,
   onSubmit,
-}: Pick<CommentDialogProps, 'label' | 'isPending' | 'error'> & {
-  onSubmit: (values: CommentValues) => void
-}) {
-  const { t } = useTranslation('task')
+}: Pick<TransitionCommentDialogProps, 'label' | 'isPending' | 'error' | 'onSubmit'>) {
+  const { t } = useTranslation('transition-comment')
   const taskErrorMessage = useTaskErrorMessage()
   const {
     register,
@@ -57,7 +58,9 @@ function CommentForm({
       noValidate
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        void handleSubmit(onSubmit)(event)
+        void handleSubmit((values) => {
+          onSubmit(values.comment)
+        })(event)
       }}
     >
       {error ? (
@@ -89,46 +92,30 @@ function CommentForm({
   )
 }
 
-/** A transition that requires a comment (e.g. returning a task for rework). */
-export function CommentDialog({
+/**
+ * A transition that requires a comment (e.g. returning a task for rework). Controlled and without
+ * a trigger: the caller opens it and closes it once the transition succeeds, so the input and the
+ * server error stay in the form when the request fails.
+ */
+export function TransitionCommentDialog({
+  open,
+  onOpenChange,
   label,
-  disabled,
   isPending,
   error,
-  onOpen,
   onSubmit,
-}: CommentDialogProps) {
-  const { t } = useTranslation('task')
-  const [open, setOpen] = useState(false)
+  onCloseAutoFocus,
+}: TransitionCommentDialogProps) {
+  const { t } = useTranslation('transition-comment')
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) onOpen()
-        setOpen(next)
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button variant="outline" disabled={disabled}>
-          {label}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{label}</DialogTitle>
           <DialogDescription>{t('comment.description')}</DialogDescription>
         </DialogHeader>
-        <CommentForm
-          label={label}
-          isPending={isPending}
-          error={error}
-          onSubmit={(values) => {
-            onSubmit(values.comment, () => {
-              setOpen(false)
-            })
-          }}
-        />
+        <CommentForm label={label} isPending={isPending} error={error} onSubmit={onSubmit} />
       </DialogContent>
     </Dialog>
   )

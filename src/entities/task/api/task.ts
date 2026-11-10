@@ -12,10 +12,12 @@ import {
 
 import {
   taskOrder,
+  type BoardTaskRow,
   type MyTaskListParams,
   type MyTaskRow,
   type ObjectTaskListParams,
   type ObjectTaskRow,
+  type TaskBoardColumnParams,
 } from '../model/task-list'
 import type { TransitionRule } from '../model/transitions'
 
@@ -28,6 +30,7 @@ export const taskKeys = {
     [...taskKeys.lists(), 'mine', userId, params] as const,
   detail: (id: string) => [...taskKeys.all, 'detail', id] as const,
   history: (id: string) => [...taskKeys.all, 'history', id] as const,
+  board: (params: TaskBoardColumnParams) => [...taskKeys.lists(), 'board', params] as const,
 }
 
 export const transitionKeys = {
@@ -42,6 +45,9 @@ const ASSIGNEE_SELECT =
   'id, title, status, created_at, assignee:profiles!tasks_assignee_id_fkey!inner(id, full_name), assignee_search:profiles!tasks_assignee_id_fkey()'
 const OBJECT_SELECT =
   'id, title, status, created_at, object:objects!tasks_object_id_fkey!inner(id, name), object_search:objects!tasks_object_id_fkey()'
+
+const BOARD_SELECT =
+  'id, title, status, created_at, assignee_id, object:objects!tasks_object_id_fkey!inner(id, name), assignee:profiles!tasks_assignee_id_fkey!inner(id, full_name)'
 
 const OBJECT_TASK_COLUMNS = { assignee: 'assignee(full_name)' }
 const MY_TASK_COLUMNS = { object: 'object(name)' }
@@ -118,6 +124,31 @@ export const taskQueries = {
               .overrideTypes<MyTaskRow[], { merge: false }>(),
           () => filtered(true).abortSignal(signal),
         )
+      },
+    })
+  },
+  /** One board column: the first `limit` tasks of a status; RLS limits an executor to their own. */
+  boardColumn: (input: TaskBoardColumnParams) => {
+    const objectIds = input.objectIds?.length ? [...input.objectIds].sort() : undefined
+    const params = { ...input, objectIds }
+    return queryOptions({
+      queryKey: taskKeys.board(params),
+      placeholderData: keepPreviousData,
+      queryFn: async ({ signal }): Promise<PageResult<BoardTaskRow>> => {
+        const [from, to] = pageRange({ pageIndex: 0, pageSize: params.limit })
+        let query = getSupabaseClient()
+          .from('tasks')
+          .select(BOARD_SELECT, { count: 'exact' })
+          .eq('status', params.status)
+        if (params.objectIds) query = query.in('object_id', params.objectIds)
+        const { data, count, error } = await query
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, to)
+          .abortSignal(signal)
+          .overrideTypes<BoardTaskRow[], { merge: false }>()
+        if (error) throw error
+        return { rows: data, total: count ?? 0 }
       },
     })
   },

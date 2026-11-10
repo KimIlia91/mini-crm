@@ -680,3 +680,250 @@ test.describe('notifications: bell popover and toasts', () => {
     ).toBeGreaterThanOrEqual(5)
   })
 })
+
+test.describe('board: accessibility', () => {
+  const COLUMNS = { width: 1280, height: 800 }
+  const TABS = { width: 375, height: 812 }
+  const ZOOM_CSS = 'html { font-size: 200% !important; }'
+  const ONCE_ON_DESKTOP = 'viewport is set explicitly per case; run once on desktop'
+
+  async function boardFixture() {
+    const [m, a] = await Promise.all([createUser('manager', 'm'), createUser('executor', 'a')])
+    const objectId = await createObject(m, `Объект ${uid()}`)
+    const workId = await createTask(m, objectId, a, `В работе ${uid()}`)
+    const { error: workError } = await a.client.rpc('change_task_status', {
+      p_task_id: workId,
+      p_to_status: 'in_progress',
+    })
+    if (workError) throw workError
+    const reviewId = await createTask(m, objectId, a, `Проверка ${uid()}`)
+    for (const to of ['in_progress', 'in_review'] as const) {
+      const { error } = await a.client.rpc('change_task_status', {
+        p_task_id: reviewId,
+        p_to_status: to,
+      })
+      if (error) throw error
+    }
+    return { m, a, objectId }
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    for (const [mode, viewport] of [
+      ['columns', COLUMNS],
+      ['tabs', TABS],
+    ] as const) {
+      test(`axe: board in ${mode} mode, ${theme} theme, also with the comment dialog open`, async ({
+        page,
+        isMobile,
+      }) => {
+        test.skip(isMobile, ONCE_ON_DESKTOP)
+        if (theme === 'dark') await useDarkTheme(page)
+        const { m, objectId } = await boardFixture()
+        await page.setViewportSize(viewport)
+        await login(page, m)
+        if (theme === 'dark') await expect(page.locator('html')).toHaveClass(/dark/)
+        await page.goto(`/board?object=${objectId}`)
+        await expect(page.getByRole('heading', { level: 1, name: 'Доска задач' })).toBeVisible()
+        await expect(page.getByRole('article').first()).toBeVisible()
+        await expectNoA11yViolations(page)
+
+        if (mode === 'tabs') {
+          await expect(page.getByRole('tab', { name: /^На проверке/ })).toHaveAttribute(
+            'aria-selected',
+            'true',
+          )
+        }
+        await page.getByRole('button', { name: 'Вернуть на доработку' }).click()
+        const dialog = page.getByRole('dialog', { name: 'Вернуть на доработку' })
+        await expect(dialog).toBeVisible()
+        await expectNoA11yViolations(page)
+        await dialog.getByRole('button', { name: 'Вернуть на доработку' }).click()
+        await expect(dialog.getByText('Укажите комментарий')).toBeVisible()
+        await expectNoA11yViolations(page)
+      })
+    }
+  }
+
+  test('axe: executor board and the object-not-found state', async ({ page }) => {
+    const { a } = await boardFixture()
+    await login(page, a)
+    await page.goto('/board')
+    await expect(page.getByRole('heading', { level: 1, name: 'Доска задач' })).toBeVisible()
+    await expect(page.getByRole('article').first()).toBeVisible()
+    await expectNoA11yViolations(page)
+    await page.goto(`/board?object=${crypto.randomUUID()}`)
+    await expect(page.getByText('Объект не найден или недоступен')).toBeVisible()
+    await expectNoA11yViolations(page)
+  })
+
+  test('structure: one h1, five named column regions with h2, tabs with one panel', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, ONCE_ON_DESKTOP)
+    const { m, objectId } = await boardFixture()
+    await login(page, m)
+    await page.goto(`/board?object=${objectId}`)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+    await expect(page.getByRole('heading', { level: 2 })).toHaveCount(5)
+    for (const name of ['Новая', 'В работе', 'На проверке', 'На доработке', 'Принята']) {
+      await expect(page.getByRole('region', { name: new RegExp(`^${name}`) })).toBeVisible()
+    }
+
+    await page.setViewportSize(TABS)
+    await expect(page.getByRole('tablist')).toBeVisible()
+    await expect(page.getByRole('tab')).toHaveCount(5)
+    await expect(page.getByRole('tabpanel')).toHaveCount(1)
+  })
+
+  test('reduced motion: cards and tabs have no running transition or animation', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const { a } = await boardFixture()
+    await login(page, a)
+    await page.goto('/board')
+    await expect(page.getByRole('article').first()).toBeVisible()
+    const longest = await page.evaluate(() => {
+      let max = 0
+      for (const el of document.querySelectorAll('article, [role="tab"], [role="tabpanel"]')) {
+        const s = getComputedStyle(el)
+        for (const value of [s.transitionDuration, s.animationDuration]) {
+          for (const part of value.split(',')) {
+            const v = parseFloat(part)
+            max = Math.max(max, part.trim().endsWith('ms') ? v / 1000 : v)
+          }
+        }
+      }
+      return max
+    })
+    expect(longest).toBeLessThanOrEqual(0.001)
+  })
+
+  test('zoom 200% and reflow at 320 px keep the board usable', async ({ page, isMobile }) => {
+    test.skip(isMobile, ONCE_ON_DESKTOP)
+    const { m, objectId } = await boardFixture()
+    await login(page, m)
+    const cases = [
+      ['zoom200', { width: 1280, height: 800 }],
+      ['reflow320', { width: 320, height: 640 }],
+    ] as const
+    for (const [state, viewport] of cases) {
+      await page.setViewportSize(viewport)
+      await page.goto(`/board?object=${objectId}`)
+      await expect(page.getByRole('article').first()).toBeVisible()
+      if (state === 'zoom200') await page.addStyleTag({ content: ZOOM_CSS })
+      await auditState(page, { screen: 'a11y-board', state, viewport, axe: false })
+    }
+  })
+
+  test('keyboard: the move button shows a focus indicator and no focus stop is covered', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(
+      isMobile,
+      'keyboard-only flow; the touch project has no keyboard focus ring to assert',
+    )
+    const [m, a] = await Promise.all([createUser('manager', 'm'), createUser('executor', 'a')])
+    const objectId = await createObject(m, `Объект ${uid()}`)
+    const title = `Задача ${uid()}`
+    await createTask(m, objectId, a, title)
+    await login(page, a)
+    await page.goto('/board')
+    const card = page
+      .getByRole('article')
+      .filter({ has: page.getByRole('link', { name: title, exact: true }) })
+    const take = card.getByRole('button', { name: 'Взять в работу' })
+    await tabTo(page, take)
+    const indicator = await take.evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { outline: s.outlineStyle, width: s.outlineWidth, shadow: s.boxShadow }
+    })
+    const visible =
+      (indicator.outline !== 'none' && parseFloat(indicator.width) > 0) ||
+      indicator.shadow !== 'none'
+    expect(visible, `no focus indicator: ${JSON.stringify(indicator)}`).toBe(true)
+
+    const problems: string[] = []
+    for (let stop = 0; stop < 60; stop++) {
+      await page.keyboard.press('Tab')
+      const result = await page.evaluate(() => {
+        const el = document.activeElement
+        if (!el || el === document.body) return { end: true, problem: null }
+        const rect = el.getBoundingClientRect()
+        const top = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2,
+        )
+        const ok = top !== null && (top === el || el.contains(top))
+        return { end: false, problem: ok ? null : `<${el.tagName.toLowerCase()}> covered` }
+      })
+      if (result.end) break
+      if (result.problem) problems.push(result.problem)
+    }
+    expect(problems, 'focused elements must not be hidden').toEqual([])
+  })
+})
+
+test.describe('board: object filter combobox accessibility', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const [mode, viewport] of [
+      ['columns', { width: 1280, height: 800 }],
+      ['tabs', { width: 375, height: 812 }],
+    ] as const) {
+      test(`axe: popover open with a selected object (${mode}, ${theme} theme)`, async ({
+        page,
+        isMobile,
+      }) => {
+        test.skip(isMobile, 'viewport is set explicitly per case; run once on desktop')
+        if (theme === 'dark') await useDarkTheme(page)
+        const m = await createUser('manager', 'm')
+        const token = uid()
+        const objectId = await createObject(m, `Фильтр ${token}`)
+        await createObject(m, `Фильтр ${token} два`)
+        await page.setViewportSize(viewport)
+        await login(page, m)
+        await page.goto(`/board?object=${objectId}`)
+        const trigger = page.getByRole('combobox', { name: /^Объект/ })
+        await expect(trigger).toBeVisible()
+        await trigger.click()
+        await page.getByRole('combobox', { name: 'Поиск по названию или адресу' }).fill(token)
+        await expect(page.getByRole('option', { name: new RegExp(token) })).toHaveCount(2)
+        await expectNoA11yViolations(page)
+        await page.keyboard.press('Escape')
+        await expect(page.getByRole('list', { name: 'Выбранные объекты' })).toBeVisible()
+        await expectNoA11yViolations(page)
+      })
+    }
+  }
+
+  test('keyboard: the combobox opens with Enter, options toggle with Enter, Esc returns focus', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(
+      isMobile,
+      'keyboard-only flow; the touch project has no keyboard focus ring to assert',
+    )
+    const m = await createUser('manager', 'm')
+    const token = uid()
+    const name = `Фильтр ${token}`
+    await createObject(m, name)
+    await login(page, m)
+    await page.goto('/board')
+    const trigger = page.getByRole('combobox', { name: /^Объект/ })
+    await tabTo(page, trigger)
+    await page.keyboard.press('Enter')
+    const search = page.getByRole('combobox', { name: 'Поиск по названию или адресу' })
+    await expect(search).toBeFocused()
+    await page.keyboard.type(token)
+    await expect(page.getByRole('option', { name })).toHaveCount(1)
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/object=/)
+    await page.keyboard.press('Escape')
+    await expect(search).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+})

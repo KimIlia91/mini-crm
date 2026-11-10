@@ -1,6 +1,7 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
 
 import { AboutPage } from '@/pages/about'
+import { BoardPage } from '@/pages/board'
 import { ChangePasswordPage } from '@/pages/change-password'
 import { LoginPage } from '@/pages/login'
 import { MyTasksPage } from '@/pages/my-tasks'
@@ -19,6 +20,7 @@ import type { RouteHandle } from './route-handle'
 const objectsHandle: RouteHandle = { crumbs: [{ id: 'objects', labelKey: 'crumbs.objects' }] }
 const objectHandle: RouteHandle = { Breadcrumbs: ObjectBreadcrumbs }
 const taskHandle: RouteHandle = { Breadcrumbs: TaskBreadcrumbs }
+const boardHandle: RouteHandle = { crumbs: [{ id: 'board', labelKey: 'crumbs.board' }] }
 const myTasksHandle: RouteHandle = { crumbs: [{ id: 'my-tasks', labelKey: 'crumbs.myTasks' }] }
 
 /**
@@ -45,6 +47,7 @@ export const routes: RouteObject[] = [
                   { path: 'objects', element: <ObjectsPage />, handle: objectsHandle },
                   { path: 'objects/:objectId', element: <ObjectPage />, handle: objectHandle },
                   { path: 'tasks/:taskId', element: <TaskPage />, handle: taskHandle },
+                  { path: 'board', element: <BoardPage />, handle: boardHandle },
                   {
                     element: <RequireRole role="executor" />,
                     children: [

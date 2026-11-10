@@ -77,3 +77,21 @@ export interface MyTaskRow {
   created_at: string
   object: { id: string; name: string }
 }
+
+/** A task card of the board: status is the column, so the row carries both related names. */
+export interface BoardTaskRow {
+  id: string
+  title: string
+  status: TaskStatus
+  created_at: string
+  assignee_id: string
+  object: { id: string; name: string }
+  assignee: { id: string; full_name: string }
+}
+
+/** One board column: the tasks of a status (optionally of some objects), newest first, up to `limit`. */
+export interface TaskBoardColumnParams {
+  status: TaskStatus
+  objectIds?: readonly string[]
+  limit: number
+}
