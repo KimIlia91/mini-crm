@@ -1,4 +1,6 @@
 /// <reference lib="dom" />
+import type { Page } from '@playwright/test'
+
 import { mainNav, SIDEBAR_TOGGLE, usesSidebarSheet } from './app-helpers'
 import {
   boardHeading,
@@ -615,13 +617,13 @@ test.describe('board: multi-select object filter', () => {
     await chips.getByRole('button', { name: `Убрать «${first.name}»` }).click()
     await expect(page).toHaveURL(new RegExp(`object=${second.id}`))
     await expect(page).not.toHaveURL(new RegExp(`object=${first.id}`))
-    await expect(chips.getByRole('button', { name: 'Сбросить' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Сбросить', exact: true })).toHaveCount(0)
     await expect(page.getByRole('link', { name: titles[0] ?? '', exact: true })).toHaveCount(0)
 
     await page.goBack()
     await expect(page).toHaveURL(new RegExp(`object=${first.id}`))
-    await expect(chips.getByRole('button', { name: 'Сбросить' })).toBeVisible()
-    await chips.getByRole('button', { name: 'Сбросить' }).click()
+    await expect(page.getByRole('button', { name: 'Сбросить', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Сбросить', exact: true }).click()
     await expect(page).not.toHaveURL(/object=/)
     await expect(objectFilter(page)).toContainText('Все объекты')
   })
@@ -714,6 +716,347 @@ test.describe('board: multi-select object filter', () => {
     await login(page, m)
     await page.goto(`/board?${objects.map((target) => `object=${target.id}`).join('&')}`)
     await expect(page.getByText('В выбранных объектах нет задач')).toBeVisible()
+  })
+})
+
+const MORE_BUTTON = /^\+\d+: показать остальные выбранные объекты/
+const CHIP_GAP = 6
+
+interface Box {
+  left: number
+  right: number
+  top: number
+  bottom: number
+  height: number
+}
+
+interface ChipsSnapshot {
+  row: Box
+  shown: { name: string; box: Box }[]
+  hiddenNames: string[]
+  more: Box
+  moreCount: number
+  reset: Box | null
+  pageOverflow: number
+}
+
+/** Geometry of the selected-object line, measured from the «+N» button that sits in it. */
+function chipsSnapshot(page: Page): Promise<ChipsSnapshot> {
+  return page.getByRole('button', { name: MORE_BUTTON }).evaluate((more) => {
+    const row = more.closest('div') ?? more
+    const boxOf = (el: Element): Box => {
+      const r = el.getBoundingClientRect()
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, height: r.height }
+    }
+    const shown: ChipsSnapshot['shown'] = []
+    const hiddenNames: string[] = []
+    for (const item of Array.from(row.querySelector('ul')?.children ?? [])) {
+      const name = item.querySelector('button')?.getAttribute('aria-label') ?? ''
+      if (getComputedStyle(item).visibility === 'hidden') hiddenNames.push(name)
+      else shown.push({ name, box: boxOf(item) })
+    }
+    const reset = Array.from(row.children).find((el) => el.textContent === 'Сбросить')
+    const root = document.documentElement
+    return {
+      row: boxOf(row),
+      shown,
+      hiddenNames,
+      more: boxOf(more),
+      moreCount: Number(/^\+(\d+)/.exec(more.textContent)?.[1] ?? Number.NaN),
+      reset: reset ? boxOf(reset) : null,
+      pageOverflow: root.scrollWidth - root.clientWidth,
+    }
+  })
+}
+
+/** Snapshot taken once all `total` chips are present and the line has stopped changing. */
+async function settledSnapshot(page: Page, total: number): Promise<ChipsSnapshot> {
+  const seen = { key: '' }
+  await expect
+    .poll(async () => {
+      const snap = await chipsSnapshot(page)
+      const key = JSON.stringify([snap.shown.map((chip) => chip.name), snap.hiddenNames])
+      const settled = key === seen.key && snap.shown.length + snap.hiddenNames.length === total
+      seen.key = key
+      return settled
+    })
+    .toBe(true)
+  return chipsSnapshot(page)
+}
+
+const removeLabel = (name: string): string => `Убрать «${name}»`
+const removalName = (label: string): string => label.slice('Убрать «'.length, -1)
+
+async function managerWithTenObjects() {
+  const token = uid()
+  const m = await createUser('manager', 'm')
+  const rows = Array.from({ length: 10 }, (_, i) => ({
+    name: `Выбор ${token} ${String(i + 1).padStart(2, '0')} с очень длинным названием объекта`,
+    address: 'Адрес e2e',
+  }))
+  const { data, error } = await m.client.from('objects').insert(rows).select('id, name')
+  if (error) throw error
+  const objects = data.sort((x, y) => x.name.localeCompare(y.name))
+  return { m, objects, query: objects.map((o) => `object=${o.id}`).join('&') }
+}
+
+test.describe('board: selected objects in one line', () => {
+  test.skip(({ isMobile }) => isMobile, 'width is set explicitly per case; run once on desktop')
+
+  for (const width of [1280, 320]) {
+    test(`${String(width)} px: one line, «+N» after the last chip, popover lists the hidden ones`, async ({
+      page,
+    }) => {
+      const { m, objects, query } = await managerWithTenObjects()
+      await login(page, m)
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto(`/board?${query}`)
+      await expect(objectFilter(page)).toContainText('Выбрано объектов: 10')
+      const moreButton = page.getByRole('button', { name: MORE_BUTTON })
+      await expect(moreButton).toBeVisible()
+
+      const stable = { value: '' }
+      await expect
+        .poll(async () => {
+          const current = await chipsSnapshot(page)
+          const next = JSON.stringify([
+            current.shown.length + current.hiddenNames.length,
+            current.shown.map((s) => s.name),
+          ])
+          const same = next === stable.value
+          stable.value = next
+          return same && current.shown.length + current.hiddenNames.length === objects.length
+        })
+        .toBe(true)
+
+      const snap = await chipsSnapshot(page)
+      expect(snap.shown.length, 'at least one chip is in the line').toBeGreaterThanOrEqual(1)
+      expect(snap.hiddenNames.length).toBeGreaterThanOrEqual(1)
+      expect(snap.moreCount, '«+N» equals the chips that are not shown').toBe(
+        snap.hiddenNames.length,
+      )
+      expect(snap.shown.length + snap.hiddenNames.length).toBe(objects.length)
+      expect(snap.pageOverflow, 'no horizontal page scroll').toBeLessThanOrEqual(0)
+
+      const line = [...snap.shown.map((s) => s.box), snap.more, ...(snap.reset ? [snap.reset] : [])]
+      expect(snap.reset, '«Сбросить» follows with two or more selected').not.toBeNull()
+      for (const box of line) {
+        expect(Math.abs(box.top - snap.more.top), 'same line').toBeLessThanOrEqual(1)
+        expect(box.left).toBeGreaterThanOrEqual(snap.row.left - 0.5)
+        expect(box.right).toBeLessThanOrEqual(snap.row.right + 0.5)
+        if (width < 640) expect(box.height).toBeGreaterThanOrEqual(43.5)
+      }
+      for (const chip of snap.shown) {
+        expect(chip.box.right - chip.box.left, 'chip is at most 10rem').toBeLessThanOrEqual(160.5)
+      }
+      const last = snap.shown.at(-1)
+      if (!last || !snap.reset) throw new Error('no last chip or reset')
+      expect(snap.more.left - last.box.right, '«+N» sits right after the last chip').toBeCloseTo(
+        CHIP_GAP,
+        0,
+      )
+      expect(snap.reset.left - snap.more.right).toBeCloseTo(CHIP_GAP, 0)
+      expect(snap.shown.map((s) => removalName(s.name))).toEqual(
+        objects.slice(0, snap.shown.length).map((o) => o.name),
+      )
+      if (width >= 640) {
+        const combobox = await objectFilter(page).boundingBox()
+        expect(snap.row.left, 'chips sit next to the combobox').toBeGreaterThanOrEqual(
+          (combobox?.x ?? 0) + (combobox?.width ?? 0) - 0.5,
+        )
+      } else {
+        const combobox = await objectFilter(page).boundingBox()
+        expect(snap.row.top, 'chips sit under the combobox').toBeGreaterThanOrEqual(
+          (combobox?.y ?? 0) + (combobox?.height ?? 0) - 0.5,
+        )
+      }
+
+      await page.getByRole('button', { name: removeLabel(removalName(last.name)) }).focus()
+      await page.keyboard.press('Tab')
+      await expect(moreButton, 'Tab skips the hidden chips').toBeFocused()
+
+      await moreButton.click()
+      const popover = page.getByRole('dialog', { name: 'Остальные выбранные объекты' })
+      await expect(popover).toBeVisible()
+      const listed = popover.getByRole('button')
+      await expect(listed).toHaveCount(snap.hiddenNames.length)
+      expect(
+        await listed.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label'))),
+      ).toEqual(snap.hiddenNames)
+
+      const [firstHidden, secondHidden] = snap.hiddenNames
+      if (!firstHidden || !secondHidden) throw new Error('need two hidden chips')
+      const removedId = objects.find((o) => o.name === removalName(firstHidden))?.id ?? ''
+      await popover.getByRole('button', { name: firstHidden }).click()
+      await expect(page).not.toHaveURL(new RegExp(`object=${removedId}`))
+      await expect(popover.getByRole('button', { name: firstHidden })).toHaveCount(0)
+      await expect(popover.getByRole('button', { name: secondHidden })).toBeFocused()
+
+      for (let guard = 0; guard < 10; guard++) {
+        const remaining = await popover.getByRole('button').count()
+        if (remaining === 0) break
+        await popover.getByRole('button').first().click()
+        await expect.poll(() => popover.getByRole('button').count()).toBeLessThan(remaining)
+      }
+      await expect(popover, 'the popover closes once everything fits').toBeHidden()
+      await expect(moreButton).toHaveCount(0)
+      const chipList = page.getByRole('list', { name: 'Выбранные объекты' })
+      await expect(
+        chipList.getByRole('button').last(),
+        'focus lands on the last visible chip',
+      ).toBeFocused()
+      expect(await focusIsOnBody(page)).toBe(false)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(0)
+    })
+  }
+
+  test('removing a visible chip focuses its neighbour; the last one sends focus to the combobox', async ({
+    page,
+  }) => {
+    const { m, objects } = await managerWithTenObjects()
+    const [one, two] = objects
+    if (!one || !two) throw new Error('objects were not created')
+    await login(page, m)
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto(`/board?object=${one.id}&object=${two.id}`)
+    const chips = page.getByRole('list', { name: 'Выбранные объекты' })
+    await expect(chips.getByRole('button')).toHaveCount(2)
+
+    await chips.getByRole('button', { name: removeLabel(one.name) }).click()
+    await expect(page).not.toHaveURL(new RegExp(`object=${one.id}`))
+    await expect(chips.getByRole('button', { name: removeLabel(two.name) })).toBeFocused()
+
+    await chips.getByRole('button', { name: removeLabel(two.name) }).click()
+    await expect(page).not.toHaveURL(/object=/)
+    await expect(objectFilter(page)).toBeFocused()
+  })
+})
+
+test.describe('board: focus after removals', () => {
+  test.skip(({ isMobile }) => isMobile, 'width is set explicitly per case; run once on desktop')
+
+  test('removing the last visible chip with the keyboard keeps focus on a visible chip or «+N»', async ({
+    page,
+  }) => {
+    const { m, query } = await managerWithTenObjects()
+    await login(page, m)
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto(`/board?${query}`)
+    await expect(objectFilter(page)).toContainText('Выбрано объектов: 10')
+    const moreButton = page.getByRole('button', { name: MORE_BUTTON })
+    await expect(moreButton).toBeVisible()
+    const before = await settledSnapshot(page, 10)
+    const last = before.shown.at(-1)
+    if (!last) throw new Error('no visible chip')
+
+    await page.getByRole('button', { name: last.name }).focus()
+    await page.keyboard.press('Enter')
+
+    await expect(page.getByRole('button', { name: last.name })).toHaveCount(0)
+    await expect.poll(() => focusIsOnBody(page)).toBe(false)
+    const focusedName = await page.evaluate(
+      () => document.activeElement?.getAttribute('aria-label') ?? '',
+    )
+    const visibleNow = (await chipsSnapshot(page)).shown.map((s) => s.name)
+    expect(
+      visibleNow.includes(focusedName) || MORE_BUTTON.test(focusedName),
+      `focus is on a visible chip or «+N», got «${focusedName}»`,
+    ).toBe(true)
+  })
+
+  test('no chip fits: only «+1» is in the line; removing from its popover focuses the combobox', async ({
+    page,
+  }) => {
+    const m = await createUser('manager', 'm')
+    const name = `Очень длинное название объекта ${uid()} ${'слово '.repeat(10)}`.trim()
+    const { data, error } = await m.client
+      .from('objects')
+      .insert({ name, address: 'Адрес e2e' })
+      .select('id')
+      .single()
+    if (error) throw error
+    await login(page, m)
+    await page.addInitScript(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        const style = document.createElement('style')
+        style.textContent = 'html { font-size: 200% !important; }'
+        document.head.append(style)
+      })
+    })
+    await page.setViewportSize({ width: 320, height: 800 })
+    await page.goto(`/board?object=${data.id}`)
+    const moreButton = page.getByRole('button', {
+      name: /^\+1: показать остальные выбранные объекты/,
+    })
+    await expect(moreButton).toBeVisible()
+    await expect(page.getByRole('list', { name: 'Выбранные объекты' })).toHaveCount(0)
+
+    await moreButton.click()
+    const popover = page.getByRole('dialog', { name: 'Остальные выбранные объекты' })
+    await popover.getByRole('button', { name: removeLabel(name) }).click()
+    await expect(page).not.toHaveURL(/object=/)
+    await expect(objectFilter(page)).toBeFocused()
+  })
+
+  test('320 px: removing the only visible chip while one is hidden leaves focus on a visible element', async ({
+    page,
+  }) => {
+    const { m, objects } = await managerWithTenObjects()
+    const [first, second] = objects
+    if (!first || !second) throw new Error('objects were not created')
+    await login(page, m)
+    await page.setViewportSize({ width: 320, height: 800 })
+    await page.goto('/board?object=' + first.id + '&object=' + second.id)
+    await expect(page.getByRole('button', { name: /^\+1: показать/ })).toBeVisible()
+    await expect
+      .poll(async () => {
+        const snap = await chipsSnapshot(page)
+        return [snap.shown.length, snap.hiddenNames.length]
+      })
+      .toEqual([1, 1])
+
+    await settledSnapshot(page, 2)
+    await page.getByRole('button', { name: removeLabel(first.name) }).focus()
+    await page.keyboard.press('Enter')
+
+    await expect(page).not.toHaveURL(new RegExp('object=' + first.id))
+    await expect(page).toHaveURL(new RegExp('object=' + second.id))
+    await expect.poll(() => focusIsOnBody(page)).toBe(false)
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const el = document.activeElement
+          if (!el || el === document.body) return 'body'
+          const rect = el.getBoundingClientRect()
+          const visible = getComputedStyle(el).visibility === 'visible' && rect.width > 0
+          const label = el.getAttribute('aria-label') ?? ''
+          return visible
+            ? label === ''
+              ? 'visible:' + String(el.getAttribute('role'))
+              : label
+            : 'invisible'
+        }),
+      )
+      .toBe(removeLabel(second.name))
+  })
+
+  test('«Сбросить» clears the selection and sends focus to the combobox', async ({ page }) => {
+    const { m, query } = await managerWithTenObjects()
+    await login(page, m)
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/board?' + query)
+    const reset = page.getByRole('button', { name: 'Сбросить', exact: true })
+    await expect(reset).toBeVisible()
+
+    await reset.focus()
+    await page.keyboard.press('Enter')
+
+    await expect(page).not.toHaveURL(/object=/)
+    await expect(objectFilter(page)).toBeFocused()
   })
 })
 

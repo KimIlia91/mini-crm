@@ -1,7 +1,6 @@
 /** Texts of the task board. Namespace: `board`. */
 export const boardRu = {
   title: 'Доска задач',
-  description: 'Задачи по статусам. Статус можно сменить кнопкой на карточке или перетаскиванием.',
   region: 'Колонки доски',
   tabs: 'Статусы задач',
   filter: {
@@ -18,6 +17,9 @@ export const boardRu = {
     remove: 'Убрать «{{name}}»',
     clear: 'Сбросить',
     selectedList: 'Выбранные объекты',
+    hidden: '+{{count}}',
+    hiddenLabel: '+{{count}}: показать остальные выбранные объекты',
+    hiddenList: 'Остальные выбранные объекты',
     limit: 'Можно выбрать не больше {{count}} объектов',
     moreCount: 'Показано {{shown}} из {{total}}',
   },
