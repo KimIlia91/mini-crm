@@ -161,6 +161,22 @@ async function rowNames(table: Locator): Promise<string[]> {
 }
 
 /**
+ * Waits until the debounced search is applied: every row matches `query`. Before that the table
+ * still shows the unfiltered list, whose page count depends on objects created by other tests.
+ */
+async function expectOnlyMatchingRows(table: Locator, query: string): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const rows = await table.locator('tbody').getByRole('row').allInnerTexts()
+        return rows.length > 0 && rows.every((row) => row.includes(query))
+      },
+      { message: 'the table shows only rows matching the search' },
+    )
+    .toBe(true)
+}
+
+/**
  * Name of the first row once the table shows a later page. The page indicator updates before the
  * rows (the previous page's rows stay as placeholder data), so wait until the first row is none of
  * the rows seen on the previous page.
@@ -198,8 +214,9 @@ test.describe('return to a list without a jump', () => {
       await login(page, m)
       await page.goto('/objects')
       await page.getByRole('searchbox', { name: 'Поиск по названию и адресу' }).fill(query)
-      await expect(page.getByRole('status').filter({ hasText: 'Страница 1 из 2' })).toBeVisible()
       const objectsTable = page.getByRole('table', { name: 'Список объектов' })
+      await expectOnlyMatchingRows(objectsTable, query)
+      await expect(page.getByRole('status').filter({ hasText: 'Страница 1 из 2' })).toBeVisible()
       const firstPage = await rowNames(objectsTable)
       await page.getByRole('button', { name: 'Следующая страница' }).click()
       await expect(page.getByRole('status').filter({ hasText: 'Страница 2 из 2' })).toBeVisible()
@@ -284,8 +301,9 @@ test.describe('return to a list without a jump', () => {
       // parallel workers that answer can take longer than the default 5 s expect budget.
       await expect(page).toHaveURL(/\/my-tasks/, { timeout: 15_000 })
       await page.getByRole('searchbox', { name: 'Поиск по названию и объекту' }).fill(query)
-      await expect(page.getByRole('status').filter({ hasText: 'Страница 1 из 2' })).toBeVisible()
       const myTable = page.getByRole('table', { name: 'Мои задачи' })
+      await expectOnlyMatchingRows(myTable, query)
+      await expect(page.getByRole('status').filter({ hasText: 'Страница 1 из 2' })).toBeVisible()
       const firstPage = await rowNames(myTable)
       await page.getByRole('button', { name: 'Следующая страница' }).click()
       await expect(page.getByRole('status').filter({ hasText: 'Страница 2 из 2' })).toBeVisible()
@@ -336,8 +354,9 @@ test.describe('return to a list without a jump', () => {
       await login(page, m)
       await page.goto('/objects')
       await page.getByRole('searchbox', { name: 'Поиск по названию и адресу' }).fill(query)
-      await expect(page.getByRole('status').filter({ hasText: 'Страница 1 из 3' })).toBeVisible()
       const table = page.getByRole('table', { name: 'Список объектов' })
+      await expectOnlyMatchingRows(table, query)
+      await expect(page.getByRole('status').filter({ hasText: 'Страница 1 из 3' })).toBeVisible()
       const pageOne = await rowNames(table)
       await page.getByRole('button', { name: 'Следующая страница' }).click()
       await expect(page.getByRole('status').filter({ hasText: 'Страница 2 из 3' })).toBeVisible()
