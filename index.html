@@ -7,27 +7,7 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
     <title>Mini-CRM</title>
-    <script>
-      // Applies the stored theme before the first paint (no flash). Keep the key in sync with
-      // THEME_STORAGE_KEY in src/shared/theme.
-      ;(function () {
-        var theme = 'system'
-        try {
-          var stored = window.localStorage.getItem('mini-crm-theme')
-          if (stored === 'light' || stored === 'dark') theme = stored
-        } catch (error) {
-          // Blocked storage: fall back to the system theme.
-        }
-        var dark =
-          theme === 'dark' ||
-          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-        var root = document.documentElement
-        root.classList.toggle('dark', dark)
-        root.style.colorScheme = dark ? 'dark' : 'light'
-        var meta = document.querySelector('meta[name="theme-color"]')
-        if (meta) meta.setAttribute('content', dark ? '#0b1120' : '#ffffff')
-      })()
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
