@@ -17,12 +17,12 @@ import {
 const WRAPPING_BADGE = 'h-auto min-h-5 max-w-full min-w-0 shrink whitespace-normal'
 
 /** Status changes of a task as a vertical timeline, oldest first (the creation is the first entry). */
-export function TaskHistory({ taskId, className }: { taskId: string; className?: string }) {
+export function TaskHistory({ taskId }: { taskId: string }) {
   const { t } = useTranslation('task')
   const history = useQuery(taskQueries.history(taskId))
 
   return (
-    <Card className={cn('min-w-0', className)}>
+    <Card className="min-w-0">
       <CardHeader>
         <h2 className="text-base leading-snug font-medium">{t('history.title')}</h2>
       </CardHeader>

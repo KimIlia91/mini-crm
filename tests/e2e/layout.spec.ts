@@ -52,6 +52,28 @@ async function move(actor: E2EUser, taskId: string, to: TaskStatus, comment?: st
   if (error) throw error
 }
 
+/** Boxes of the three cards of the task page, found by their headings. */
+async function taskCardBoxes(page: Page) {
+  const boxOf = (name: string) =>
+    page.getByRole('heading', { level: 2, name, exact: true }).evaluate((heading) => {
+      const r = (heading.closest('[data-slot="card"]') ?? heading).getBoundingClientRect()
+      return {
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        width: r.width,
+        height: r.height,
+      }
+    })
+  const [details, description, history] = await Promise.all([
+    boxOf('Детали'),
+    boxOf('Описание'),
+    boxOf('История'),
+  ])
+  return { details, description, history }
+}
+
 interface DialogCase {
   page: Page
   screen: string
@@ -484,6 +506,102 @@ test.describe('layout: manager', () => {
       await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
       await auditState(page, { screen: 'task-new-executor', state: 'page', viewport: vp })
     })
+  })
+
+  test('task page: two columns by container width, one column at 375 and at 200% text', async ({
+    page,
+  }) => {
+    const m = await createUser('manager', 'm')
+    const a = await createUser('executor', 'a')
+    const objectId = await createObject(m, `Объект ${uid()}`, 'Адрес')
+    const title = `Короткая ${uid()}`
+    const taskId = await createTask(m, objectId, a, title, 'Короткое описание')
+    await login(page, m)
+    await page.goto(`/tasks/${taskId}`)
+    await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+    await expect(page.getByText('Создана', { exact: true })).toBeVisible()
+
+    await resize(page, { width: 1280, height: 800 })
+    await expect
+      .poll(async () => {
+        const { details, history } = await taskCardBoxes(page)
+        return history.left >= details.right - 1
+      })
+      .toBe(true)
+    const wide = await taskCardBoxes(page)
+    expect(wide.description.top, 'description is below details').toBeGreaterThanOrEqual(
+      wide.details.bottom - 1,
+    )
+    expect(wide.description.left).toBeCloseTo(wide.details.left, 0)
+    expect(wide.history.width, 'history is at most 24rem').toBeLessThanOrEqual(384.5)
+    expect(wide.history.width, 'history is narrower than details').toBeLessThan(wide.details.width)
+    expect(wide.history.height, 'history is as tall as the left column').toBeGreaterThanOrEqual(
+      wide.description.bottom - wide.details.top - 1,
+    )
+    expect(wide.history.top).toBeCloseTo(wide.details.top, 0)
+
+    await resize(page, { width: 375, height: 812 })
+    await expect
+      .poll(async () => {
+        const { details, description, history } = await taskCardBoxes(page)
+        return (
+          description.top >= details.bottom - 1 &&
+          history.top >= description.bottom - 1 &&
+          Math.abs(history.left - details.left) < 1 &&
+          Math.abs(history.width - details.width) < 1
+        )
+      })
+      .toBe(true)
+
+    await resize(page, { width: 1280, height: 800 })
+    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+    await expect
+      .poll(async () => {
+        const { details, description, history } = await taskCardBoxes(page)
+        return (
+          description.top >= details.bottom - 1 &&
+          history.top >= description.bottom - 1 &&
+          Math.abs(history.left - details.left) < 1
+        )
+      })
+      .toBe(true)
+  })
+
+  test('task page: a long description leaves about 24px below the last card at the end of the scroll', async ({
+    page,
+  }) => {
+    const m = await createUser('manager', 'm')
+    const a = await createUser('executor', 'a')
+    const objectId = await createObject(m, `Объект ${uid()}`, 'Адрес')
+    const title = longTaskTitle()
+    const taskId = await createTask(m, objectId, a, title, LONG.description)
+    await login(page, m)
+    await resize(page, { width: 1280, height: 800 })
+    await page.goto(`/tasks/${taskId}`)
+    await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+    await expect(page.getByText('Строка 5:')).toBeVisible()
+
+    const main = page.getByRole('main')
+    const scrolls = await main.evaluate((el) => el.scrollHeight > el.clientHeight + 1)
+    expect(scrolls, 'main scrolls by itself with a long description').toBe(true)
+    await main.evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+    })
+    await expect
+      .poll(() =>
+        main.evaluate((el) => {
+          const cards = [...el.querySelectorAll('[data-slot="card"]')]
+          const lastBottom = Math.max(...cards.map((c) => c.getBoundingClientRect().bottom))
+          return Math.round(el.getBoundingClientRect().bottom - lastBottom)
+        }),
+      )
+      .toBeGreaterThanOrEqual(20)
+    const gap = await main.evaluate((el) => {
+      const cards = [...el.querySelectorAll('[data-slot="card"]')]
+      const lastBottom = Math.max(...cards.map((c) => c.getBoundingClientRect().bottom))
+      return el.getBoundingClientRect().bottom - lastBottom
+    })
+    expect(gap, 'space below the last card').toBeLessThanOrEqual(28)
   })
 
   for (const theme of ['light', 'dark'] as const) {

@@ -44,7 +44,7 @@ export function BoardPage() {
 
   return (
     <div className="flex min-w-0 flex-col gap-4 sm:gap-6 fit-screen:min-h-0 fit-screen:flex-1">
-      <PageHeader title={t('title')} description={t('description')} />
+      <PageHeader title={t('title')} />
       <MoveLayer move={move} />
       {allMissing ? (
         <Empty>

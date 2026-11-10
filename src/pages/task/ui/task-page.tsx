@@ -82,7 +82,7 @@ export function TaskPage() {
   const isManager = viewer.role === 'manager'
 
   return (
-    <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
+    <div className="@container flex min-w-0 flex-col gap-4 sm:gap-6 fit-screen:pb-6">
       <PageHeader
         title={data.title}
         clamp
@@ -138,53 +138,58 @@ export function TaskPage() {
 
       {data.status === 'rework' ? <ReworkNotice taskId={data.id} /> : null}
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
-        <Card className="min-w-0 lg:col-start-3 lg:row-span-2 lg:row-start-1">
-          <CardHeader>
-            <h2 className="text-base leading-snug font-medium">{t('details.title')}</h2>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid min-w-0 gap-3 text-sm">
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <dt className="text-muted-foreground">{t('details.object')}</dt>
-                <dd>
-                  <Link className={cn(textLinkClass, 'min-w-0')} to={`/objects/${data.object.id}`}>
-                    {data.object.name}
-                  </Link>
-                </dd>
-              </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <dt className="text-muted-foreground">{t('details.assignee')}</dt>
-                <dd className="[overflow-wrap:anywhere]">{data.assignee.full_name}</dd>
-              </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <dt className="text-muted-foreground">{t('details.author')}</dt>
-                <dd className="[overflow-wrap:anywhere]">{data.author.full_name}</dd>
-              </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <dt className="text-muted-foreground">{t('details.createdAt')}</dt>
-                <dd>
-                  <time dateTime={data.created_at}>{formatDateTime(data.created_at)}</time>
-                </dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-        <Card className="min-w-0 lg:col-span-2 lg:col-start-1">
-          <CardHeader>
-            <h2 className="text-base leading-snug font-medium">{t('description.title')}</h2>
-          </CardHeader>
-          <CardContent>
-            {data.description ? (
-              <p className="text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
-                {data.description}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">{t('description.empty')}</p>
-            )}
-          </CardContent>
-        </Card>
-        <TaskHistory taskId={data.id} className="lg:col-span-2 lg:col-start-1" />
+      <div className="grid min-w-0 gap-4 @2xl:grid-cols-[minmax(0,1fr)_min(24rem,33%)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card className="min-w-0">
+            <CardHeader>
+              <h2 className="text-base leading-snug font-medium">{t('details.title')}</h2>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid min-w-0 gap-3 text-sm">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <dt className="text-muted-foreground">{t('details.object')}</dt>
+                  <dd>
+                    <Link
+                      className={cn(textLinkClass, 'min-w-0')}
+                      to={`/objects/${data.object.id}`}
+                    >
+                      {data.object.name}
+                    </Link>
+                  </dd>
+                </div>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <dt className="text-muted-foreground">{t('details.assignee')}</dt>
+                  <dd className="[overflow-wrap:anywhere]">{data.assignee.full_name}</dd>
+                </div>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <dt className="text-muted-foreground">{t('details.author')}</dt>
+                  <dd className="[overflow-wrap:anywhere]">{data.author.full_name}</dd>
+                </div>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <dt className="text-muted-foreground">{t('details.createdAt')}</dt>
+                  <dd>
+                    <time dateTime={data.created_at}>{formatDateTime(data.created_at)}</time>
+                  </dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+          <Card className="min-w-0">
+            <CardHeader>
+              <h2 className="text-base leading-snug font-medium">{t('description.title')}</h2>
+            </CardHeader>
+            <CardContent>
+              {data.description ? (
+                <p className="text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
+                  {data.description}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t('description.empty')}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        <TaskHistory taskId={data.id} />
       </div>
     </div>
   )
