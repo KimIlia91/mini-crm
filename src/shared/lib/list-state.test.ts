@@ -85,3 +85,70 @@ describe('list state', () => {
     expect(takeOpenedRow('objects')).toBeNull()
   })
 })
+
+describe('repeated object parameter', () => {
+  const ids = Array.from(
+    { length: 12 },
+    (_, i) => `00000000-0000-4000-8000-0000000000${String(i).padStart(2, '0')}`,
+  )
+
+  it('keeps several object values in order', () => {
+    expect(sanitizeListSearch(`object=${ids[1]}&object=${ids[0]}`)).toBe(
+      `object=${ids[1]}&object=${ids[0]}`,
+    )
+  })
+
+  it('keeps at most ten object values', () => {
+    const clean = new URLSearchParams(sanitizeListSearch(ids.map((id) => `object=${id}`).join('&')))
+    expect(clean.getAll('object')).toEqual(ids.slice(0, 10))
+  })
+
+  it('drops empty and oversized object values individually', () => {
+    const clean = new URLSearchParams(
+      sanitizeListSearch(`object=&object=${ids[0]}&object=${'a'.repeat(201)}`),
+    )
+    expect(clean.getAll('object')).toEqual([ids[0]])
+  })
+
+  it('still keeps a single value for the other parameters', () => {
+    expect(sanitizeListSearch('q=a&q=b&column=new&column=rework')).toBe('q=a&column=new')
+  })
+
+  it('round-trips several objects through storage', () => {
+    rememberListSearch('board', `object=${ids[0]}&object=${ids[1]}`)
+    expect(new URLSearchParams(readListSearch('board')).getAll('object')).toEqual([ids[0], ids[1]])
+  })
+})
+
+describe('list state of the board', () => {
+  const objectId = '0f0e0d0c-1111-4222-8333-444455556666'
+
+  it('keeps the object and the column', () => {
+    expect(sanitizeListSearch(`object=${objectId}&column=in_review`)).toBe(
+      `object=${objectId}&column=in_review`,
+    )
+    rememberListSearch('board', `object=${objectId}&column=rework`)
+    expect(new URLSearchParams(readListSearch('board')).get('object')).toBe(objectId)
+    expect(new URLSearchParams(readListSearch('board')).get('column')).toBe('rework')
+  })
+
+  it('drops unknown parameters next to the board ones', () => {
+    expect(
+      sanitizeListSearch(`object=${objectId}&token=secret&column=new&redirect=//evil.com`),
+    ).toBe(`object=${objectId}&column=new`)
+  })
+
+  it('cuts overlong object and column values', () => {
+    expect(sanitizeListSearch(`object=${'a'.repeat(201)}&column=new`)).toBe('column=new')
+    expect(sanitizeListSearch(`object=${objectId}&column=${'x'.repeat(201)}`)).toBe(
+      `object=${objectId}`,
+    )
+  })
+
+  it('keeps the board state apart from the other lists', () => {
+    rememberListSearch('board', `object=${objectId}`)
+    rememberListSearch('my-tasks', 'status=new')
+    expect(readListSearch('my-tasks')).toBe('status=new')
+    expect(readListSearch('board')).toBe(`object=${objectId}`)
+  })
+})

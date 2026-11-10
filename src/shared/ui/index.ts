@@ -63,6 +63,7 @@ export {
   BreadcrumbSeparator,
 } from './breadcrumb'
 export { BreadcrumbTrail, BreadcrumbTrailHost, type BreadcrumbTrailItem } from './breadcrumb-trail'
+export { Command, CommandGroup, CommandInput, CommandItem, CommandList } from './command'
 export { ConfirmDialog } from './confirm-dialog'
 export {
   DataTable,
@@ -170,5 +171,6 @@ export {
   TableHeader,
   TableRow,
 } from './table'
+export { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs'
 export { textLinkClass } from './text-link'
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'

@@ -20,14 +20,6 @@ export const taskRu = {
   },
   reworkNotice: { title: 'Замечание постановщика', meta: '{{name}}, {{date}}' },
   actionsLoadError: 'Не удалось загрузить доступные действия',
-  comment: {
-    description: 'Комментарий обязателен: исполнитель увидит его в истории.',
-    label: 'Комментарий',
-  },
-  validation: {
-    commentRequired: 'Укажите комментарий',
-    commentTooLong: 'Не более 1000 символов',
-  },
   history: {
     title: 'История',
     empty: 'История пуста',

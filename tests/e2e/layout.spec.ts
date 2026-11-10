@@ -859,3 +859,165 @@ test.describe('layout: notifications (bell popover and toasts)', () => {
     }
   })
 })
+
+test.describe('layout: board', () => {
+  async function longBoard() {
+    const m = await createUser('manager', LONG.userLabel)
+    const a = await createUser('executor', LONG.userLabel)
+    const objectName = longObjectName()
+    const objectId = await createObject(m, objectName, LONG.address)
+    const titles: string[] = []
+    for (const to of [null, 'in_progress', 'in_review'] as const) {
+      const title = longTaskTitle()
+      const taskId = await createTask(m, objectId, a, title)
+      if (to) await move(a, taskId, 'in_progress')
+      if (to === 'in_review') await move(a, taskId, 'in_review')
+      titles.push(title)
+    }
+    return { m, a, objectId, objectName, titles }
+  }
+
+  async function showColumn(page: Page, name: string): Promise<void> {
+    const tab = page.getByRole('tab', { name: new RegExp(`^${name}`) })
+    if ((await tab.count()) > 0) await tab.click()
+  }
+
+  async function auditBoard(page: Page, screen: string, objectId: string, titles: string[]) {
+    await forViewports(page, async (vp) => {
+      await page.goto(`/board?object=${objectId}`)
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Доска задач', exact: true }),
+      ).toBeVisible()
+      await showColumn(page, 'На проверке')
+      const link = page.getByRole('link', { name: titles[2] ?? '', exact: true })
+      await expect(link).toBeVisible()
+      await expect(link, 'clamped title keeps the full text').toHaveAttribute(
+        'title',
+        titles[2] ?? '',
+      )
+      await auditState(page, { screen, state: 'long-data', viewport: vp })
+
+      await page.goto('/board')
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Доска задач', exact: true }),
+      ).toBeVisible()
+      await showColumn(page, 'На проверке')
+      await expect(page.getByRole('link', { name: titles[2] ?? '', exact: true })).toBeVisible()
+      await auditState(page, { screen, state: 'long-data-all-objects', viewport: vp })
+
+      await page.getByRole('link', { name: titles[2] ?? '', exact: true }).waitFor()
+      const card = page
+        .getByRole('article')
+        .filter({ has: page.getByRole('link', { name: titles[2] ?? '', exact: true }) })
+      await card.getByRole('button', { name: 'Вернуть на доработку' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Вернуть на доработку' })
+      await expect(dialog).toBeVisible()
+      await expectFocusInside(dialog, `${screen} comment dialog @ ${String(vp.width)}`)
+      await dialog.getByLabel('Комментарий').fill(LONG.comment)
+      await auditState(page, { screen, state: 'comment-dialog', viewport: vp })
+      await page.keyboard.press('Escape')
+      await expect(dialog).toBeHidden()
+    })
+  }
+
+  test('manager board with long data in the light theme (columns and tabs, comment dialog)', async ({
+    page,
+  }) => {
+    const { m, objectId, titles } = await longBoard()
+    await login(page, m)
+    await auditBoard(page, 'board-manager', objectId, titles)
+  })
+
+  test('manager board with long data in the dark theme', async ({ page }) => {
+    await useDarkTheme(page)
+    const { m, objectId, titles } = await longBoard()
+    await login(page, m)
+    await expect(page.locator('html')).toHaveClass(/dark/)
+    await auditBoard(page, 'board-manager-dark', objectId, titles)
+  })
+
+  test('executor board with long data and a not-found object', async ({ page }) => {
+    const { a, objectId, titles } = await longBoard()
+    await login(page, a)
+    await forViewports(page, async (vp) => {
+      await page.goto(`/board?object=${objectId}`)
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Доска задач', exact: true }),
+      ).toBeVisible()
+      await showColumn(page, 'В работе')
+      await expect(page.getByRole('link', { name: titles[1] ?? '', exact: true })).toBeVisible()
+      await auditState(page, { screen: 'board-executor', state: 'long-data', viewport: vp })
+
+      await page.goto(`/board?object=${crypto.randomUUID()}`)
+      await expect(page.getByText('Объект не найден или недоступен')).toBeVisible()
+      await auditState(page, { screen: 'board-executor', state: 'object-not-found', viewport: vp })
+    })
+  })
+
+  test('executor: empty board', async ({ page }) => {
+    const lonely = await createUser('executor', 'lonely')
+    await login(page, lonely)
+    await forViewports(page, async (vp) => {
+      await page.goto('/board')
+      await expect(page.getByText('Вам пока не назначили задачи')).toBeVisible()
+      await auditState(page, { screen: 'board-executor', state: 'empty', viewport: vp })
+    })
+  })
+
+  test('manager: an object without tasks offers to reset the filter', async ({ page }) => {
+    const m = await createUser('manager', 'empty')
+    const objectId = await createObject(m, `Пустой ${uid()}`)
+    await login(page, m)
+    await forViewports(page, async (vp) => {
+      await page.goto(`/board?object=${objectId}`)
+      await expect(page.getByText('В объекте нет задач')).toBeVisible()
+      await expect(
+        page
+          .getByRole('button', { name: 'Сбросить фильтр' })
+          .or(page.getByRole('link', { name: 'Сбросить фильтр' })),
+      ).toBeVisible()
+      await auditState(page, { screen: 'board-manager', state: 'empty-object', viewport: vp })
+    })
+  })
+})
+
+test.describe('layout: board object filter popover', () => {
+  test('long object names: bounded width, native scroll, no overflow at every width', async ({
+    page,
+  }) => {
+    const m = await createUser('manager', LONG.userLabel)
+    const token = uid()
+    const name = longObjectName(token)
+    await createObject(m, name, LONG.address)
+    await createObject(m, `${token}-короткий`, 'Адрес')
+    await login(page, m)
+
+    await forViewports(page, async (vp) => {
+      await page.goto('/board')
+      await expect(page.getByRole('heading', { level: 1, name: 'Доска задач' })).toBeVisible()
+      const trigger = page.getByRole('combobox', { name: /Объект/ })
+      await trigger.click()
+      const search = page.getByRole('combobox', { name: 'Поиск по названию или адресу' })
+      await search.fill(token)
+      const options = page.getByRole('option', { name: new RegExp(token) })
+      await expect(options).toHaveCount(2)
+      const popover = page.getByRole('dialog').filter({ has: search })
+      const box = await popover.boundingBox()
+      expect(box?.x ?? -1, `popover left @ ${String(vp.width)}`).toBeGreaterThanOrEqual(0)
+      expect((box?.x ?? 0) + (box?.width ?? 0), 'popover right edge').toBeLessThanOrEqual(
+        vp.width + 0.5,
+      )
+      await expect(popover.getByRole('button'), 'native scroll: no arrow buttons').toHaveCount(0)
+      const overflowY = await page
+        .getByRole('listbox')
+        .evaluate((el) => getComputedStyle(el).overflowY)
+      expect(['auto', 'scroll']).toContain(overflowY)
+      await auditState(page, { screen: 'board-filter', state: 'popover-long', viewport: vp })
+
+      await options.first().click()
+      await page.keyboard.press('Escape')
+      await expect(popover).toBeHidden()
+      await auditState(page, { screen: 'board-filter', state: 'chip-long', viewport: vp })
+    })
+  })
+})

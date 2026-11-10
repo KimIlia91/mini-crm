@@ -1,8 +1,10 @@
 const PREFIX = 'mini-crm:list:'
 const OPENED_PREFIX = `${PREFIX}opened:`
 /** Only these query parameters are ever stored; everything else in a URL is dropped. */
-const ALLOWED_PARAMS = ['q', 'status', 'sort', 'page', 'size'] as const
+const ALLOWED_PARAMS = ['q', 'status', 'sort', 'page', 'size', 'object', 'column'] as const
 const MAX_VALUE_LENGTH = 200
+/** Parameters that may repeat (`?object=a&object=b`), with the most values kept. */
+const REPEATED_PARAMS: Readonly<Record<string, number>> = { object: 10 }
 const MAX_KEY_LENGTH = 100
 
 function storage(): Storage | null {
@@ -19,8 +21,10 @@ export function sanitizeListSearch(search: string): string {
   const source = new URLSearchParams(search)
   const clean = new URLSearchParams()
   for (const name of ALLOWED_PARAMS) {
-    const value = source.get(name)
-    if (value !== null && value !== '' && value.length <= MAX_VALUE_LENGTH) clean.set(name, value)
+    const values = source.getAll(name).slice(0, REPEATED_PARAMS[name] ?? 1)
+    for (const value of values) {
+      if (value !== '' && value.length <= MAX_VALUE_LENGTH) clean.append(name, value)
+    }
   }
   return clean.toString()
 }

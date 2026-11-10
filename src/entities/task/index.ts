@@ -16,10 +16,12 @@ export {
   pickMyTaskSort,
   pickObjectTaskSort,
   pickStatuses,
+  type BoardTaskRow,
   type MyTaskListParams,
   type MyTaskRow,
   type ObjectTaskListParams,
   type ObjectTaskRow,
+  type TaskBoardColumnParams,
 } from './model/task-list'
 export { getAvailableTransitions, type TransitionRule } from './model/transitions'
 export { TASK_STATUS_ICON, TaskStatusBadge } from './ui/task-status-badge'
