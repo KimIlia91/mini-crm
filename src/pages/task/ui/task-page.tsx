@@ -189,7 +189,9 @@ export function TaskPage() {
             </CardContent>
           </Card>
         </div>
-        <TaskHistory taskId={data.id} />
+        <div className="relative min-w-0">
+          <TaskHistory taskId={data.id} className="@2xl:absolute @2xl:inset-0" />
+        </div>
       </div>
     </div>
   )

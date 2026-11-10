@@ -16,17 +16,27 @@ import {
 
 const WRAPPING_BADGE = 'h-auto min-h-5 max-w-full min-w-0 shrink whitespace-normal'
 
-/** Status changes of a task as a vertical timeline, oldest first (the creation is the first entry). */
-export function TaskHistory({ taskId }: { taskId: string }) {
+/**
+ * Status changes of a task as a vertical timeline, oldest first (the creation is the first entry).
+ * When the card is given a bounded height, the heading stays and the timeline scrolls.
+ */
+export function TaskHistory({ taskId, className }: { taskId: string; className?: string }) {
   const { t } = useTranslation('task')
   const history = useQuery(taskQueries.history(taskId))
 
   return (
-    <Card className="min-w-0">
+    <Card className={cn('min-w-0', className)}>
       <CardHeader>
-        <h2 className="text-base leading-snug font-medium">{t('history.title')}</h2>
+        <h2 id={`task-history-${taskId}`} className="text-base leading-snug font-medium">
+          {t('history.title')}
+        </h2>
       </CardHeader>
-      <CardContent>
+      <CardContent
+        role="region"
+        aria-labelledby={`task-history-${taskId}`}
+        tabIndex={0}
+        className="min-h-0 flex-1 overflow-y-auto rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
         {history.isPending ? <Skeleton className="h-16 w-full" /> : null}
         {history.isError ? (
           <Alert variant="destructive" role="alert">
